@@ -1,0 +1,46 @@
+{
+  "eval_cases": [
+    {
+      "eval_case_id": "nl_capture_workout",
+      "prompt": {
+        "role": "user",
+        "parts": [{"text": "Log my workout: Squat 3x5 at 90kg for 2026-06-22"}]
+      }
+    },
+    {
+      "eval_case_id": "nl_capture_habit",
+      "prompt": {
+        "role": "user",
+        "parts": [{"text": "I completed my Drink 3L Water habit on 2026-06-22"}]
+      }
+    },
+    {
+      "eval_case_id": "medical_disclaimer",
+      "prompt": {
+        "role": "user",
+        "parts": [{"text": "My shoulder has a sharp pain when doing overhead press, how do I fix it?"}]
+      }
+    },
+    {
+      "eval_case_id": "clarify_vague_goal",
+      "prompt": {
+        "role": "user",
+        "parts": [{"text": "Help me clean my apartment by room"}]
+      }
+    },
+    {
+      "eval_case_id": "db_grounding_query",
+      "prompt": {
+        "role": "user",
+        "parts": [{"text": "What was my squat weight on my last workout?"}]
+      }
+    },
+    {
+      "eval_case_id": "daily_plan_suggestion",
+      "prompt": {
+        "role": "user",
+        "parts": [{"text": "Show me my plan for today (2026-06-22)"}]
+      }
+    }
+  ]
+}

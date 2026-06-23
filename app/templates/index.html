@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Assistant Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        :root {
+            --bg-base: #0d150f;
+            --bg-surface: #0f1712;
+            --bg-card: #121d16;
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --primary: #c9a227;
+            --accent-red: #ef4444;
+            --accent-red-hover: #f87171;
+            --font-main: 'Outfit', sans-serif;
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+            --radius-xs: 4px;
+            --radius-full: 9999px;
+            --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3);
+            --shadow-modal: 0 4px 12px rgba(0, 0, 0, 0.4);
+            --tag-work-text: #c9a227;
+            --tag-work-bg: rgba(201, 162, 39, 0.12);
+            --tag-health-text: #c9a227;
+            --tag-health-bg: rgba(201, 162, 39, 0.12);
+            --tag-default-text: #c9a227;
+            --tag-default-bg: rgba(201, 162, 39, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            font-family: var(--font-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        header {
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-subtle);
+            background-color: var(--bg-base);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .live-indicator {
+            width: 8px;
+            height: 8px;
+            background-color: var(--primary);
+            border-radius: var(--radius-full);
+            display: inline-block;
+        }
+
+        .header-date {
+            color: var(--text-secondary);
+            font-size: 15px;
+            font-weight: 500;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 6px 16px;
+            border-radius: var(--radius-full);
+            border: 1px solid var(--border-subtle);
+        }
+
+         .top-nav {
+            display: flex;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-subtle);
+            padding: 4px;
+            border-radius: var(--radius-full);
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 6px 18px;
+            border-radius: var(--radius-full);
+            font-size: 15px;
+            font-weight: 500;
+            transition: var(--transition-smooth);
+        }
+
+        .nav-link:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .nav-link.active {
+            color: #0d150f;
+            background: var(--primary);
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 24px;
+            padding: 24px;
+            flex-grow: 1;
+            max-width: 1600px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Panel Base */
+        .panel {
+            position: relative;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-panel);
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-header h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Left Column: Chat Assistant */
+        .chat-panel {
+            height: calc(100vh - 120px);
+            position: sticky;
+            top: 96px;
+        }
+
+        .chat-messages {
+            flex-grow: 1;
+            padding: 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .message-bubble {
+            max-width: 85%;
+            padding: 14px 18px;
+            border-radius: var(--radius-md);
+            font-size: 15px;
+            line-height: 1.5;
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        .message-user {
+            background-color: rgba(201, 162, 39, 0.12);
+            border: 1px solid rgba(201, 162, 39, 0.3);
+            color: var(--text-primary);
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message-agent {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-primary);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-agent p {
+            margin-bottom: 8px;
+        }
+
+        .message-agent p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message-agent ul, .message-agent ol {
+            margin-left: 20px;
+            margin-bottom: 8px;
+        }
+
+        .chat-input-area {
+            padding: 20px;
+            border-top: 1px solid var(--border-subtle);
+            background: rgba(17, 24, 39, 0.4);
+        }
+
+        .chat-form {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex-grow: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 14px 18px;
+            color: var(--text-primary);
+            font-family: var(--font-main);
+            font-size: 16px;
+            outline: none;
+            transition: var(--transition-smooth);
+        }
+
+        .chat-input:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        .btn-send {
+            background: var(--primary);
+            border: none;
+            border-radius: var(--radius-md);
+            color: #0d150f;
+            padding: 0 24px;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-send:hover {
+            background-color: #dbb63b;
+            color: #0d150f;
+        }
+
+        /* Right Column: Dashboard Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+
+        .dashboard-row-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-row-split {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .dashboard-three-split {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .dashboard-three-split > :nth-child(1) { /* Today's Schedule */
+            grid-column: span 2;
+            order: 1;
+        }
+
+        .dashboard-three-split > :nth-child(3) { /* Habits To Do Today */
+            grid-column: span 1;
+            order: 2;
+        }
+
+        .dashboard-three-split > :nth-child(2) { /* Open & Overdue Tasks */
+            grid-column: span 3;
+            order: 3;
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard-three-split {
+                grid-template-columns: 1fr;
+            }
+            .dashboard-three-split > * {
+                grid-column: span 1 !important;
+                order: initial !important;
+            }
+        }
+
+        /* Dashboard Section Styles */
+        .section-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 28px 32px;
+            transition: var(--transition-smooth);
+        }
+
+        .section-card:hover {
+            border-color: var(--text-muted);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-subtle);
+            padding-bottom: 12px;
+        }
+
+        .section-title span {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 10px;
+            border-radius: var(--radius-full);
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* Tasks Style */
+        .task-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 350px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .task-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            transition: var(--transition-smooth);
+        }
+
+        .task-item:hover {
+            border-color: var(--text-muted);
+        }
+
+        .task-checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            cursor: pointer;
+        }
+
+        .task-checkbox {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--text-muted);
+            border-radius: var(--radius-xs);
+            cursor: pointer;
+            margin-top: 2px;
+            transition: var(--transition-smooth);
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .task-checkbox::before {
+            content: "";
+            position: absolute;
+            top: -13px;
+            left: -13px;
+            right: -13px;
+            bottom: -13px;
+        }
+
+        .task-checkbox:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        .task-checkbox:checked {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .task-checkbox:checked::after {
+            content: "";
+            position: absolute;
+            top: 2px;
+            left: 5px;
+            width: 4px;
+            height: 8px;
+            border: solid #0d150f;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+
+        .task-content {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .task-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-primary);
+            transition: var(--transition-smooth);
+        }
+
+        .task-checkbox:checked + .task-content .task-title {
+            text-decoration: line-through;
+            color: var(--text-muted);
+        }
+
+        .task-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .task-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .task-tag {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: var(--radius-xs);
+            background: var(--tag-default-bg);
+            color: var(--tag-default-text);
+        }
+
+        .task-tag.work {
+            background: var(--tag-work-bg);
+            color: var(--tag-work-text);
+        }
+
+        .task-tag.health {
+            background: var(--tag-health-bg);
+            color: var(--tag-health-text);
+        }
+
+        .task-source {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .task-due {
+            font-size: 14px;
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        .btn-delete {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px;
+            border-radius: var(--radius-xs);
+            transition: var(--transition-smooth);
+            position: relative;
+        }
+
+        .btn-delete::before {
+            content: "";
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            right: -10px;
+            bottom: -10px;
+        }
+
+        .btn-delete:hover {
+            color: var(--accent-red);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        /* Habits Style */
+        .habit-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        .habit-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 18px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            transition: var(--transition-smooth);
+        }
+
+        .habit-item:hover {
+            border-color: var(--text-muted);
+        }
+
+        .habit-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .habit-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .habit-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .habit-streak {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--primary);
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        .btn-log-habit {
+            background: rgba(201, 162, 39, 0.12);
+            border: 1px solid rgba(201, 162, 39, 0.25);
+            color: var(--primary);
+            padding: 8px 18px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+
+        .btn-log-habit:hover {
+            background: var(--primary);
+            color: #0d150f;
+        }
+
+        .btn-log-habit.completed {
+            background: rgba(255, 255, 255, 0.03);
+            border-color: var(--border-subtle);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        /* Workouts Style */
+        .workout-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .workout-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 20px 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            position: relative;
+            transition: var(--transition-smooth);
+        }
+
+        .workout-item:hover {
+            border-color: var(--text-muted);
+        }
+
+        .workout-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-right: 28px;
+        }
+
+        .workout-exercise {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .workout-date {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .workout-sets {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .workout-set-badge {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            padding: 4px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .workout-notes {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-style: italic;
+            border-left: 2px solid var(--primary);
+            padding-left: 8px;
+            margin-top: 4px;
+        }
+
+        .workout-item .btn-delete {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+        }
+
+        /* Calendar Style */
+        .calendar-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .calendar-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 16px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .calendar-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .calendar-time {
+            font-size: 14px;
+            color: var(--primary);
+            font-weight: 500;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: var(--radius-sm);
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Daily Plan Suggestion styling */
+        .daily-plan-content {
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-primary);
+        }
+        .daily-plan-content p {
+            margin-bottom: 12px;
+        }
+        .daily-plan-content ul, .daily-plan-content ol {
+            margin-left: 20px;
+            margin-bottom: 12px;
+        }
+        .daily-plan-content li {
+            margin-bottom: 6px;
+        }
+        .daily-plan-content strong {
+            color: var(--primary);
+        }
+
+        /* Markdown Table & Code block styling */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            font-size: 14px;
+        }
+        th, td {
+            padding: 10px 12px;
+            border: 1px solid var(--border-subtle);
+            text-align: left;
+        }
+        th {
+            background-color: rgba(201, 162, 39, 0.12);
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+        pre {
+            background: var(--shadow-pre);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            overflow-x: auto;
+            margin: 12px 0;
+        }
+        code {
+            font-family: monospace;
+            font-size: 13px;
+            color: var(--primary);
+        }
+
+        /* Custom Confirmation Modal */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+        }
+        .modal-backdrop.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-card {
+            background: #111827;
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            width: 90%;
+            max-width: 400px;
+            padding: 28px;
+            text-align: center;
+            transform: scale(0.9);
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow-modal);
+        }
+        .modal-backdrop.show .modal-card {
+            transform: scale(1);
+        }
+        .modal-icon {
+            font-size: 40px;
+            margin-bottom: 16px;
+        }
+        .modal-message {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        .btn-modal {
+            padding: 10px 24px;
+            border-radius: var(--radius-md);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            border: 1px solid transparent;
+            font-family: var(--font-main);
+        }
+        .btn-cancel {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--border-subtle);
+            color: var(--text-secondary);
+        }
+        .btn-cancel:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+        .btn-confirm {
+            background: var(--accent-red);
+            color: #f3f4f6;
+        }
+        .btn-confirm:hover {
+            background: var(--accent-red-hover);
+        }
+
+        /* Focus Outline styling */
+        button:focus-visible,
+        .nav-link:focus-visible,
+        a:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        /* Icon + Text vertical alignment */
+        .icon-text-pair {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .emoji-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        .clock-emoji, .calendar-emoji {
+            position: relative;
+            top: 1px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <h1>Personal Assistant v1</h1>
+            <span class="live-indicator" aria-label="System Active Status"></span>
+        </div>
+        <nav class="top-nav">
+            <a href="/" hx-get="/dashboard" hx-target="#content-area" hx-push-url="true" class="nav-link {% if active_tab == 'dashboard' %}active{% endif %}">Dashboard</a>
+            <a href="/tasks" hx-get="/tasks" hx-target="#content-area" hx-push-url="true" class="nav-link {% if active_tab == 'tasks' %}active{% endif %}">Tasks</a>
+            <a href="/habits" hx-get="/habits" hx-target="#content-area" hx-push-url="true" class="nav-link {% if active_tab == 'habits' %}active{% endif %}">Habits</a>
+            <a href="/workouts" hx-get="/workouts" hx-target="#content-area" hx-push-url="true" class="nav-link {% if active_tab == 'workouts' %}active{% endif %}">Workouts</a>
+            <a href="/calendar" hx-get="/calendar" hx-target="#content-area" hx-push-url="true" class="nav-link {% if active_tab == 'calendar' %}active{% endif %}">Calendar</a>
+        </nav>
+        <div class="header-date" id="current-date">{{ today_date }}</div>
+    </header>
+
+    <div class="container">
+        <!-- Chat Assistant Panel -->
+        <div class="panel chat-panel">
+            <div class="panel-header">
+                <h2>💬 AI Assistant</h2>
+            </div>
+            
+            <div class="chat-messages" id="chat-box">
+                <div class="message-bubble message-agent">
+                    Hello! I am your personal assistant. I can track your tasks, habits, and workouts, or answer any advisory queries. Try telling me "Log my squats 3x5 at 80kg" or "Show me my plan for today"!
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <form class="chat-form" 
+                      hx-post="/chat" 
+                      hx-target="#chat-box" 
+                      hx-swap="beforeend" 
+                      hx-indicator="#chat-indicator">
+                    <input type="text" 
+                           id="chat-msg-input"
+                           name="message" 
+                           class="chat-input" 
+                           placeholder="Ask your assistant..." 
+                           required 
+                           autocomplete="off">
+                    <button type="submit" class="btn-send">Send</button>
+                </form>
+                <div id="chat-indicator" class="htmx-indicator" style="font-size: 12px; color: var(--text-secondary); margin-top: 8px; text-align: center;">
+                    Assistant is thinking...
+                </div>
+            </div>
+        </div>
+
+        <!-- Swappable Content Area -->
+        <div id="content-area" style="min-width: 0;">
+            {{ content_html | safe }}
+        </div>
+    </div>
+
+    <!-- Custom Elegant Confirmation Dialog -->
+    <div id="confirm-modal" class="modal-backdrop" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-icon">⚠️</div>
+            <div class="modal-message" id="confirm-modal-message">Are you sure you want to delete this item?</div>
+            <div class="modal-actions">
+                <button class="btn-modal btn-cancel" id="confirm-modal-cancel">Cancel</button>
+                <button class="btn-modal btn-confirm" id="confirm-modal-confirm">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Custom elegant confirmation dialog for HTMX deletes
+        document.body.addEventListener('htmx:confirm', function(evt) {
+            // Only intercept if the triggering element has hx-confirm
+            if (!evt.detail.question) {
+                return;
+            }
+
+            // Prevent standard browser confirm
+            evt.preventDefault();
+
+            // Get confirmation message from element attribute
+            const confirmMessage = evt.detail.question || "Are you sure you want to proceed?";
+            
+            // Show custom modal
+            const modal = document.getElementById('confirm-modal');
+            const messageEl = document.getElementById('confirm-modal-message');
+            const cancelBtn = document.getElementById('confirm-modal-cancel');
+            const confirmBtn = document.getElementById('confirm-modal-confirm');
+
+            messageEl.textContent = confirmMessage;
+            modal.style.display = 'flex';
+            // Trigger transition on next frame
+            requestAnimationFrame(() => {
+                modal.classList.add('show');
+            });
+
+            // Define cleanup function to remove event listeners safely
+            function closeModal() {
+                modal.classList.remove('show');
+                setTimeout(() => {
+                    modal.style.display = 'none';
+                }, 250); // Match transition duration (0.25s)
+            }
+
+            // Confirm callback
+            function onConfirm() {
+                closeModal();
+                evt.detail.issueRequest(true); // Proceed with HTMX request
+                cleanup();
+            }
+
+            // Cancel callback
+            function onCancel() {
+                closeModal();
+                cleanup();
+            }
+
+            function cleanup() {
+                confirmBtn.removeEventListener('click', onConfirm);
+                cancelBtn.removeEventListener('click', onCancel);
+                modal.removeEventListener('click', onOutsideClick);
+            }
+
+            function onOutsideClick(e) {
+                if (e.target === modal) {
+                    onCancel();
+                }
+            }
+
+            confirmBtn.addEventListener('click', onConfirm);
+            cancelBtn.addEventListener('click', onCancel);
+            modal.addEventListener('click', onOutsideClick);
+        });
+
+        // Handle immediate visual updates when form is submitted
+        const chatForm = document.querySelector('.chat-form');
+        if (chatForm) {
+            chatForm.addEventListener('submit', function(evt) {
+                const input = document.getElementById('chat-msg-input');
+                const message = input.value;
+                if (message.trim()) {
+                    // Append user bubble immediately
+                    const chatBox = document.getElementById('chat-box');
+                    const userBubble = document.createElement('div');
+                    userBubble.className = 'message-bubble message-user';
+                    userBubble.textContent = message;
+                    chatBox.appendChild(userBubble);
+                    
+                    // Clear input and scroll in the next tick so HTMX can serialize first
+                    setTimeout(() => {
+                        input.value = '';
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                    }, 0);
+                }
+            });
+        }
+
+        // Auto scroll chat box to bottom when agent response arrives
+        document.body.addEventListener('htmx:afterRequest', function(evt) {
+            if (evt.detail.target.id === "chat-box" && evt.detail.successful) {
+                const chatBox = document.getElementById('chat-box');
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        });
+
+        // Update active nav link based on current window location
+        function updateActiveNav() {
+            const path = window.location.pathname;
+            document.querySelectorAll('.nav-link').forEach(link => {
+                const href = link.getAttribute('href');
+                const isDashboard = (href === '/' && (path === '/' || path === '/dashboard'));
+                if (href === path || isDashboard) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+        }
+        document.body.addEventListener('htmx:afterOnLoad', updateActiveNav);
+        window.addEventListener('popstate', updateActiveNav);
+
+        // Keyboard shortcut: Press '/' or 'Cmd/Ctrl + K' to focus chat input
+        window.addEventListener('keydown', function(e) {
+            const input = document.getElementById('chat-msg-input');
+            if (!input) return;
+
+            const activeEl = document.activeElement;
+            const isTyping = activeEl && (
+                activeEl.tagName === 'INPUT' || 
+                activeEl.tagName === 'TEXTAREA' || 
+                activeEl.isContentEditable
+            );
+
+            const isSlashKey = e.key === '/' && !isTyping;
+            const isCmdK = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k';
+
+            if (isSlashKey || isCmdK) {
+                e.preventDefault();
+                input.focus();
+                input.select();
+            }
+        });
+
+        // Close modal on 'Esc' key press
+        window.addEventListener('keydown', function(e) {
+            const modal = document.getElementById('confirm-modal');
+            if (modal && modal.classList.contains('show') && e.key === 'Escape') {
+                e.preventDefault();
+                document.getElementById('confirm-modal-cancel').click();
+            }
+        });
+    </script>
+</body>
+</html>

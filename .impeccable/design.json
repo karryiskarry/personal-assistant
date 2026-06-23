@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-23T14:53:00Z",
+  "title": "Design System: The Midnight Console",
+  "extensions": {
+    "colorMeta": {
+      "midnight-base": {
+        "role": "neutral",
+        "displayName": "Midnight Base",
+        "canonical": "oklch(15% 0.02 140)",
+        "tonalRamp": ["#030604", "#060a07", "#0d150f", "#0f1712", "#121d16", "#17251c", "#203327", "#2e4838"]
+      },
+      "translucent-obsidian": {
+        "role": "neutral",
+        "displayName": "Opaque Obsidian Panel",
+        "canonical": "oklch(18% 0.02 140)",
+        "tonalRamp": ["#050806", "#0d150f", "#0f1712", "#121d16", "#17251c", "#203327", "#2e4838", "#41654e"]
+      },
+      "muted-glass-card": {
+        "role": "neutral",
+        "displayName": "Solid Card Green",
+        "canonical": "oklch(20% 0.02 140)",
+        "tonalRamp": ["#0d150f", "#0f1712", "#121d16", "#17251c", "#203327", "#2e4838", "#41654e", "#568469"]
+      },
+      "accent-gold": {
+        "role": "primary",
+        "displayName": "Accent Gold",
+        "canonical": "oklch(71% 0.14 80)",
+        "tonalRamp": ["#302400", "#5c4700", "#8f6f00", "#c9a227", "#dbb63b", "#ecce65", "#fae799", "#fffad6"]
+      },
+      "accent-gold-hover": {
+        "role": "primary",
+        "displayName": "Accent Gold Hover",
+        "canonical": "oklch(76% 0.16 80)",
+        "tonalRamp": ["#5c4700", "#8f6f00", "#c9a227", "#dbb63b", "#ecce65", "#fae799", "#fffad6", "#ffffff"]
+      },
+      "warning-crimson": {
+        "role": "secondary",
+        "displayName": "Warning Crimson",
+        "canonical": "oklch(58% 0.22 25)",
+        "tonalRamp": ["#470d0d", "#821818", "#c82b2b", "#ef4444", "#f37575", "#f7a7a7", "#fbd9d9", "#fef6f6"]
+      },
+      "subtle-frost-border": {
+        "role": "neutral",
+        "displayName": "Subtle Frost Border",
+        "canonical": "rgba(255, 255, 255, 0.08)",
+        "tonalRamp": ["#ffffff03", "#ffffff05", "#ffffff08", "#ffffff0c", "#ffffff10", "#ffffff14", "#ffffff20", "#ffffff30"]
+      },
+      "frost-white": {
+        "role": "neutral",
+        "displayName": "Frost White",
+        "canonical": "oklch(96% 0.005 260)",
+        "tonalRamp": ["#262a30", "#4f555e", "#7b828c", "#a8afba", "#d1d5db", "#f3f4f6", "#f9fafb", "#ffffff"]
+      },
+      "cool-gray": {
+        "role": "neutral",
+        "displayName": "Cool Gray",
+        "canonical": "oklch(70% 0.01 260)",
+        "tonalRamp": ["#16191d", "#30343a", "#4e535a", "#717781", "#9ca3af", "#c3c7cd", "#e2e4e7", "#f7f7f8"]
+      },
+      "muted-charcoal": {
+        "role": "neutral",
+        "displayName": "Muted Charcoal",
+        "canonical": "oklch(50% 0.01 260)",
+        "tonalRamp": ["#0f1013", "#222429", "#3b3e46", "#545963", "#6b7280", "#949aa3", "#bdc1c7", "#e7e9eb"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Main dashboard header and brand identity title." },
+      "headline": { "displayName": "Headline", "purpose": "Panel and primary section headers." },
+      "title": { "displayName": "Title", "purpose": "Section inner cards and lists title text." },
+      "body": { "displayName": "Body", "purpose": "General dashboard text, task items description, message logs." },
+      "label": { "displayName": "Label", "purpose": "Supporting metadata, timestamps, badge labels." }
+    },
+    "shadows": [
+      { "name": "shadow-panel", "value": "0 1px 2px rgba(0, 0, 0, 0.3)", "purpose": "Base panel container depth layering." },
+      { "name": "shadow-card", "value": "none", "purpose": "Individual list element base depth." },
+      { "name": "shadow-modal", "value": "0 4px 12px rgba(0, 0, 0, 0.4)", "purpose": "Overlay modal cards neutral shadow." }
+    ],
+    "motion": [
+      { "name": "transition-smooth", "value": "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Standard micro-interaction transitions." }
+    ],
+    "breakpoints": [
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1200px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Send Button",
+      "kind": "button",
+      "refersTo": "button-send",
+      "description": "Trigger button inside the chat interface to send text commands.",
+      "html": "<button class=\"ds-btn-send\">SEND</button>",
+      "css": ".ds-btn-send { font-family: 'Outfit', sans-serif; background: #c9a227; border: none; border-radius: 12px; color: #0d150f; padding: 14px 28px; font-weight: 600; font-size: 15px; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: inline-flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 0.05em; } .ds-btn-send:hover { background: #dbb63b; } .ds-btn-send:focus-visible { outline: 2px solid #c9a227; outline-offset: 2px; }"
+    },
+    {
+      "name": "Log Habit Button",
+      "kind": "button",
+      "refersTo": "button-log-habit",
+      "description": "Button on habit items to log completion.",
+      "html": "<button class=\"ds-btn-log-habit\">Log Habit</button>",
+      "css": ".ds-btn-log-habit { font-family: 'Outfit', sans-serif; background: rgba(201, 162, 39, 0.12); border: 1px solid rgba(201, 162, 39, 0.25); color: #c9a227; padding: 8px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-log-habit:hover { background: #c9a227; color: #0d150f; } .ds-btn-log-habit:focus-visible { outline: 2px solid #c9a227; outline-offset: 2px; }"
+    },
+    {
+      "name": "Delete Action Button",
+      "kind": "button",
+      "refersTo": "button-delete",
+      "description": "Quiet delete action button for list items.",
+      "html": "<button class=\"ds-btn-delete\">×</button>",
+      "css": ".ds-btn-delete { font-family: 'Outfit', sans-serif; background: transparent; border: none; color: #6b7280; cursor: pointer; font-size: 14px; padding: 4px 8px; border-radius: 4px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative; } .ds-btn-delete::before { content: ''; position: absolute; top: -10px; left: -10px; right: -10px; bottom: -10px; } .ds-btn-delete:hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); } .ds-btn-delete:focus-visible { outline: 2px solid #c9a227; outline-offset: 2px; }"
+    },
+    {
+      "name": "Chat Command Input",
+      "kind": "input",
+      "refersTo": "chat-input",
+      "description": "Omni-box text command input field.",
+      "html": "<input class=\"ds-chat-input\" type=\"text\" placeholder=\"Type command here...\" />",
+      "css": ".ds-chat-input { font-family: 'Outfit', sans-serif; width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px 18px; color: #f3f4f6; font-size: 16px; outline: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); } .ds-chat-input:focus { border-color: #c9a227; }"
+    },
+    {
+      "name": "Opaque Panel",
+      "kind": "card",
+      "refersTo": "translucent-obsidian",
+      "description": "Base panel container style for dashboard containers.",
+      "html": "<div class=\"ds-panel\"><div class=\"ds-panel-header\">Panel Heading</div><div class=\"ds-panel-body\">Panel content goes here.</div></div>",
+      "css": ".ds-panel { font-family: 'Outfit', sans-serif; background: #0f1712; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; box-shadow: var(--shadow-panel, 0 1px 2px rgba(0, 0, 0, 0.3)); display: flex; flex-direction: column; overflow: hidden; width: 100%; max-width: 320px; } .ds-panel-header { padding: 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); font-size: 20px; font-weight: 600; color: #f3f4f6; } .ds-panel-body { padding: 24px; font-size: 16px; color: #9ca3af; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Midnight Console",
+    "overview": "A sleek, dark cockpit for personal productivity, designed for single-user daily tracking. It balances a high-contrast data layout with a single solid gold/amber highlight and sharp, clear divisions, ensuring the user can digest their day in under 10 seconds. Every visual element has a functional purpose, prioritizing clean typography and flat, clean layouts over heavy borders.",
+    "keyCharacteristics": [
+      "Deep, dark forest base (#0d150f) with solid opaque green panels.",
+      "Solid Accent Gold for primary highlights, buttons, and active states.",
+      "High-density data layout utilizing the clean, geometric Outfit typeface.",
+      "Tactile, responsive micro-interactions that respect accessibility preferences."
+    ],
+    "rules": [
+      { "name": "The 10% Accent Rule", "body": "Accent colors (Gold, Red) should collectively occupy less than 10% of any screen. Their rarity ensures high visibility.", "section": "colors" },
+      { "name": "The High-Contrast Text Rule", "body": "All body copy must maintain a minimum contrast ratio of 4.5:1 against its background. Never use text lighter than Cool Gray (#9ca3af) on cards.", "section": "colors" },
+      { "name": "The Outfit Only Rule", "body": "Do not introduce any other font families. All hierarchy must be expressed through Outfit's weight and opacity scale.", "section": "typography" },
+      { "name": "The Frost Border Rule", "body": "Elevation changes are denoted by subtle color differences and a translucent frost border (rgba(255, 255, 255, 0.08)), never solid black or high-contrast borders.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do respect the user's reduced-motion preference by disabling transforms and transitions when requested.",
+      "Do use rgba(255, 255, 255, 0.08) for container boundaries to maintain a soft glass border."
+    ],
+    "donts": [
+      "Don't use Notion-style corporate blue or generic SaaS cream/beige backgrounds (Obsidian light, Bear, Things 3) which represent the generic AI app default.",
+      "Don't use fitness-app neon orange (Strava orange or MyFitnessPal) or motivational gamification badges that create visual noise.",
+      "Don't fall back to monospace \"developer cosplay\" hacker terminal green-on-black aesthetics.",
+      "Don't add notification indicators, red badges, or infinite scroll elements that trigger user anxiety.",
+      "Don't use backdrop-filter/blur, gradients, or colored/tinted glow shadows anywhere — flat opaque surfaces, solid accent colors, and neutral (black-only) shadows or no shadow."
+    ]
+  }
+}
