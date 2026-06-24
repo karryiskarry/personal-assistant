@@ -26,6 +26,8 @@ Design decisions worth calling out:
 - Deterministic logic (thresholds, date math, warm-up set calculations, recurrence advancement) lives in code, never in model reasoning — the model is only used for genuine judgment calls.
 - Recurring tasks preserve history via `parent_task_id` lineage rather than mutating a single row in place.
 - The Dashboard tab aggregates "what's due today" via plain SQL — no LLM call on every tab visit.
+- Tests run against an isolated temporary SQLite database (`tests/conftest.py` patches `DB_PATH` per test) — never the live file, after a real incident where routine test runs silently wiped real active-exercise data.
+- The agent resolves names/descriptions to internal database IDs itself before any mutation or confirmation — it never asks the user to supply or look up a raw ID.
 
 ## Features
 
@@ -33,6 +35,8 @@ Design decisions worth calling out:
 - Goal-style plan generation (e.g. chore breakdowns, weekly training splits) with clarifying questions for vague requests
 - Deterministic warm-up set calculator (no LLM math)
 - "Current Lifts" progress tracking for exercises in the active training plan
+- Per-habit completion heatmap across all four habit frequencies (daily/weekly/biweekly/monthly), each with a frequency-appropriate grid shape and time window
+- Workout history grouped into per-date session cards, rather than a flat exercise-by-exercise list
 - Recurring task support with safe undo (no duplicate/orphaned instances)
 - Explicit deletion confirmation on all destructive actions
 - Medical disclaimers on fitness advice; all advisory answers grounded in actual logged data
@@ -98,7 +102,6 @@ personal-assistant/
 
 ## Known Limitations / Planned Enhancements
 
-- Per-habit completion heatmap (implemented)
 - Calendar is a mock/seeded dataset — no real Google Calendar integration yet (would require an MCP server)
 - Exercise-name matching for plan/progress tracking is exact-string only (no fuzzy matching)
 - No proactive/ambient nudges — the agent is reactive to the dashboard or chat, not scheduled
