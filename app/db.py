@@ -3,9 +3,10 @@ import os
 import sqlite3
 from datetime import datetime, timedelta
 
-DB_PATH = os.path.join(
+_DEFAULT_DB_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "personal_assistant.db"
 )
+DB_PATH: str = os.environ.get("PERSONAL_ASSISTANT_DB_PATH", _DEFAULT_DB_PATH)
 
 
 def get_db_connection():

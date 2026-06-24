@@ -14,15 +14,17 @@
 # limitations under the License.
 
 import datetime
+import os
 from zoneinfo import ZoneInfo
 
+import google.auth
 from google.adk.agents import Agent
 from google.adk.apps import App
 from google.adk.models import Gemini
+from google.adk.tools.mcp_tool import McpToolset
+from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
 from google.genai import types
-
-import os
-import google.auth
+from mcp import StdioServerParameters
 
 # Initialize database
 from .db import init_db, seed_mock_data
@@ -31,20 +33,19 @@ init_db()
 seed_mock_data()
 
 from .tools import (
-    get_current_date,
-    create_task,
+    calculate_warmup_sets,
     complete_task,
-    update_task,
     create_habit,
-    log_habit,
-    log_workout,
+    create_task,
     delete_item_tool,
     execute_db_query,
-    get_calendar_events,
+    get_current_date,
     get_habit_streaks,
-    calculate_warmup_sets,
+    log_habit,
+    log_workout,
     set_exercise_active,
     sync_active_exercises,
+    update_task,
 )
 
 from google.adk.agents.callback_context import CallbackContext
@@ -182,7 +183,7 @@ Guidelines:
    - *CRITICAL*: Always base your advisory/analysis answers strictly on the user's logged database data using the `execute_db_query` tool. Do not fabricate or hallucinate trends not supported by what is recorded.
 4. **Daily Plan Suggestion**: When suggestions for a daily plan are requested:
    - Call `get_current_date` to know today's date.
-   - Fetch the calendar events for the day using `get_calendar_events`.
+   - Fetch the calendar events for the day using the `list_events` tool (provided via the calendar MCP server).
    - Query open tasks and due habits for the day.
    - Combine these into a friendly ordered schedule.
 5. **Deletion Safety**: Deleting is permanent and cannot be undone. You MUST follow this two-step process — never skip step 1:
@@ -215,11 +216,28 @@ root_agent = Agent(
         log_workout,
         delete_item_tool,
         execute_db_query,
-        get_calendar_events,
         get_habit_streaks,
         calculate_warmup_sets,
         set_exercise_active,
         sync_active_exercises,
+        McpToolset(
+            connection_params=StdioConnectionParams(
+                server_params=StdioServerParameters(
+                    command="uv",
+                    args=[
+                        "run",
+                        "--project",
+                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "python",
+                        "-m",
+                        "app.mcp_servers.calendar_server",
+                    ],
+                    cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                ),
+                timeout=10.0,
+            ),
+            tool_filter=["list_events"],
+        ),
     ],
     before_agent_callback=load_skills_callback,
 )

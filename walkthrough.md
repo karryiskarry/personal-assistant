@@ -99,6 +99,12 @@ Implemented a pure arithmetic `calculate_warmup_sets` tool with zero LLM math in
   - Inserted the `⚠️` warning emoji inline for overdue tasks in `get_dashboard_tasks()`, prepending it to the due date badge using the standard `.icon-text-pair` wrapper.
   - Removed the redundant word "habit" from the frequency descriptor inside both uncompleted dashboard habits and the list items in the Habits tab.
 - **Import Bug Fix & Endpoint Integration Testing**: Fixed a missing import issue for `get_period_start` in [main.py](file:///Users/Karina.Peppler/Library/CloudStorage/OneDrive-SenacorTechnologiesAG/agy2-projects/personal_assistant/personal-assistant/app/main.py#L14) that was causing 500 NameError responses on `/habits/items`. Created a new integration test [test_app.py](file:///Users/Karina.Peppler/Library/CloudStorage/OneDrive-SenacorTechnologiesAG/agy2-projects/personal_assistant/personal-assistant/tests/integration/test_app.py) to perform end-to-end FastAPI endpoint calls using `TestClient` to assert successful HTML responses.
+- **Calendar MCP Server (Phase 1)**: Extracted calendar event retrieval from a direct Python tool call into a local MCP server over stdio, validating the agent ↔ MCP plumbing end-to-end:
+  - Added `google-adk[gcp,mcp]>=2.0.0,<3.0.0` to `pyproject.toml`; `uv sync` installed `mcp==1.28.0`.
+  - Created [app/mcp_servers/calendar_server.py](file:///Users/Karina.Peppler/Library/CloudStorage/OneDrive-SenacorTechnologiesAG/agy2-projects/personal_assistant/personal-assistant/app/mcp_servers/calendar_server.py) — a `FastMCP` server exposing one tool `list_events(date: str) -> dict` backed by the same `get_readonly_db_connection()` / `LIKE '{date}%'` query used by the original function. Runs over stdio transport.
+  - Wired `McpToolset(StdioConnectionParams(StdioServerParameters(command="uv", ...)))` into the agent's `tools` list in [agent.py](file:///Users/Karina.Peppler/Library/CloudStorage/OneDrive-SenacorTechnologiesAG/agy2-projects/personal_assistant/personal-assistant/app/agent.py); removed `get_calendar_events` from the agent tool list; updated the daily-plan instruction to reference `list_events`.
+  - Left `get_calendar_events` in `tools.py` and `app/main.py`'s `/calendar/today` and `/calendar` endpoints untouched — the Dashboard's "Today's Schedule" widget is a deterministic no-LLM call that must never route through the agent or MCP.
+  - The `test_agent_stream` integration test confirmed a live MCP roundtrip (warning `mcp_toolset.py:314` shows the stdio subprocess being spawned during test execution). All 15 tests pass.
 
 ---
 
@@ -126,3 +132,4 @@ Implemented a pure arithmetic `calculate_warmup_sets` tool with zero LLM math in
    ```
 2. Open `http://127.0.0.1:8000` in your web browser.
 3. Interact with the chat assistant, check out the dynamic daily plan suggestions, and log your tasks/workouts!
+
