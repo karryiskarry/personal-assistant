@@ -422,4 +422,26 @@ def test_heatmap_query_window():
         conn.close()
 
 
+def test_resolve_weekday_date():
+    import datetime
+    import pytest
+    from app.tools import resolve_weekday_date
+
+    # Verify that resolving works case-insensitively
+    res_sat = resolve_weekday_date("saturday")
+    assert res_sat["weekday"] == "Saturday"
+    dt_sat = datetime.datetime.strptime(res_sat["date"], "%Y-%m-%d")
+    assert dt_sat.weekday() == 5
+
+    res_mon = resolve_weekday_date("  MONDAY  ")
+    assert res_mon["weekday"] == "Monday"
+    dt_mon = datetime.datetime.strptime(res_mon["date"], "%Y-%m-%d")
+    assert dt_mon.weekday() == 0
+
+    # Test error cases
+    with pytest.raises(ValueError):
+        resolve_weekday_date("Funday")
+
+
+
 

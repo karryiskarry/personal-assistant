@@ -43,6 +43,7 @@ from .tools import (
     get_habit_streaks,
     log_habit,
     log_workout,
+    resolve_weekday_date,
     set_exercise_active,
     sync_active_exercises,
     update_task,
@@ -178,7 +179,8 @@ Guidelines:
    - **Habits — create vs. log (these are different operations):**
      - Use `create_habit` when the user wants to *start tracking* a new recurring behaviour going forward. Signals: "I want to track X", "add a habit for Y", "remind me to Z every day", "start a new habit". This inserts a row into the `habits` table. Ask for frequency ('daily' or 'weekly') if not stated.
      - Use `log_habit` when the user reports *having done* an existing habit today or on a specific date. Signals: "I did X today", "log my meditation", "mark flossing done". This inserts a row into `habit_logs`. Before calling it, use `execute_db_query` to find the `habit_id` for the named habit — never guess the ID.
-2. **Goal-style plan generation**: For vague or open-ended plan requests (e.g. "clean my apartment by room" or "structure my push/pull/legs week"), do NOT guess details or generate tasks immediately. You MUST ask clarifying questions first to gather the necessary details. Once details are clear, decompose the goal into structured tasks using `create_task` (set `source` as 'plan_generated').
+2. **Goal-style plan generation (Clarification & Confirmation)**: For vague or open-ended plan requests (e.g. "clean my apartment by room" or "structure my push/pull/legs week"), do NOT guess details or call plan-altering tools immediately (such as `create_task`, `sync_active_exercises`, or `set_exercise_active`). You MUST ask clarifying questions first to gather the necessary details. Once details are clear, decompose the goal into structured tasks using `create_task` (set `source` as 'plan_generated').
+   - **Handling Repeated/Unanswered Vague Requests**: If the user repeats a vague request without answering your clarifying questions, or only partially answers them, you must NOT call any plan-altering tool directly. Instead, you must explicitly state your assumptions to the user and ask for confirmation (e.g., "I will assume a standard 4-day upper/lower hypertrophy split unless you specify otherwise. Should I go ahead and update your exercises?"), then wait for their explicit confirming reply (e.g., "yes", "go ahead") before invoking the tool. Mirror the two-step confirmation flow used for deletion.
 3. **Read-only queries & Advisory**: Answer questions on workout progress trends, exercise advice, and calculations.
    - *CRITICAL*: Always base your advisory/analysis answers strictly on the user's logged database data using the `execute_db_query` tool. Do not fabricate or hallucinate trends not supported by what is recorded.
 4. **Daily Plan Suggestion**: When suggestions for a daily plan are requested:
@@ -194,6 +196,7 @@ Guidelines:
    - Use `table_name = 'tasks'` to delete a task.
    - Use `table_name = 'habits'` to delete a habit.
    - Use `table_name = 'workout_logs'` to delete a workout log entry. Do NOT use `'workouts'` — the table is named `workout_logs`.
+6. **Weekday Date Resolution**: Whenever the user references a relative weekday name (e.g. 'Monday', 'Saturday', 'next Friday') without an explicit calendar date (e.g. '2026-06-24'), you MUST call the `resolve_weekday_date` tool to determine the correct calendar date instead of performing date arithmetic yourself. Once resolved, use that date to query the database or call the `list_events` tool.
 
 Active Skill Guidelines:
 {injected_skills}
@@ -208,6 +211,7 @@ root_agent = Agent(
     instruction=agent_instruction,
     tools=[
         get_current_date,
+        resolve_weekday_date,
         create_task,
         complete_task,
         update_task,

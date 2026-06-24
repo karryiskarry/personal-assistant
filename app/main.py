@@ -29,11 +29,12 @@ templates = Jinja2Templates(directory=templates_path)
 runner = InMemoryRunner(agent=root_agent, app_name="app")
 
 
-def format_german_date(date_val, long_format=False) -> str:
+def format_display_date(date_val, long_format=False, with_weekday=False) -> str:
     """
-    Formats a date object or YYYY-MM-DD string into German format.
-    If long_format=True, returns e.g. "Dienstag, 23. Juni 2026".
-    Otherwise, returns "DD.MM.YYYY" (e.g. "23.06.2026").
+    Formats a date object or YYYY-MM-DD string into display format.
+    If long_format=True, returns e.g. "Wednesday, 24. June 2026".
+    If with_weekday=True, returns e.g. "Wednesday, 24.06.2026".
+    Otherwise, returns "DD.MM.YYYY" (e.g. "24.06.2026").
     """
     if not date_val:
         return ""
@@ -54,41 +55,100 @@ def format_german_date(date_val, long_format=False) -> str:
     else:
         date_obj = date_val
 
+    weekdays = {
+        0: "Monday",
+        1: "Tuesday",
+        2: "Wednesday",
+        3: "Thursday",
+        4: "Friday",
+        5: "Saturday",
+        6: "Sunday"
+    }
+
     if long_format:
-        weekdays = {
-            0: "Montag",
-            1: "Dienstag",
-            2: "Mittwoch",
-            3: "Donnerstag",
-            4: "Freitag",
-            5: "Samstag",
-            6: "Sonntag"
-        }
         months = {
-            1: "Januar",
-            2: "Februar",
-            3: "März",
+            1: "January",
+            2: "February",
+            3: "March",
             4: "April",
-            5: "Mai",
-            6: "Juni",
-            7: "Juli",
+            5: "May",
+            6: "June",
+            7: "July",
             8: "August",
             9: "September",
-            10: "Oktober",
+            10: "October",
             11: "November",
-            12: "Dezember"
+            12: "December"
         }
         weekday_name = weekdays.get(date_obj.weekday(), "")
         month_name = months.get(date_obj.month, "")
         return f"{weekday_name}, {date_obj.day}. {month_name} {date_obj.year}"
+    elif with_weekday:
+        weekday_name = weekdays.get(date_obj.weekday(), "")
+        return f"{weekday_name}, {date_obj.day:02d}.{date_obj.month:02d}.{date_obj.year}"
     else:
         return f"{date_obj.day:02d}.{date_obj.month:02d}.{date_obj.year}"
 
 
-def render_calendar_events_html(events, show_date=False) -> str:
+def render_calendar_events_html(events, show_date=False, empty_message="No events scheduled.") -> str:
     html = ""
     if not events:
-        return "<div style='color: var(--text-muted); font-size: 14px; font-style: italic;'>No events scheduled.</div>"
+        return f"<div style='color: var(--text-muted); font-size: 14px; font-style: italic;'>{empty_message}</div>"
+    
+    import itertools
+    
+    if show_date:
+        today_str = datetime.date.today().strftime("%Y-%m-%d")
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Determine the unique dates in order and find the first date >= today
+        unique_dates = sorted(list({e["start_time"].split(" ")[0] for e in events if " " in e["start_time"]}))
+        target_scroll_date = None
+        for d in unique_dates:
+            if d >= today_str:
+                target_scroll_date = d
+                break
+
+        for date_part, group in itertools.groupby(events, key=lambda e: e["start_time"].split(" ")[0] if " " in e["start_time"] else e["start_time"]):
+            formatted_date = format_display_date(date_part, with_weekday=True)
+            items_html = ""
+            
+            # Identify group parameters
+            id_attr = 'id="calendar-today-group"' if date_part == target_scroll_date else ""
+            is_past_day = date_part < today_str
+            group_class = "calendar-day-group past-day" if is_past_day else "calendar-day-group"
+            
+            for e in group:
+                start_time = (
+                    e["start_time"].split(" ")[1] if " " in e["start_time"] else e["start_time"]
+                )
+                end_time = (
+                    e["end_time"].split(" ")[1] if " " in e["end_time"] else e["end_time"]
+                )
+                time_str = f'<span class="calendar-duration">{start_time} - {end_time}</span>'
+                
+                is_today = (date_part == today_str)
+                is_past = (e.get("end_time") and e["end_time"] < now_str)
+                class_name = "calendar-item past" if (is_today and is_past) else "calendar-item"
+                
+                items_html += f"""
+                <div class="{class_name}">
+                    <div class="calendar-title">{e["title"]}</div>
+                    <div class="calendar-time">{time_str}</div>
+                </div>
+                """
+            html += f"""
+            <div class="{group_class}" {id_attr}>
+                <div class="calendar-day-header">
+                    <div class="calendar-day-date">{formatted_date}</div>
+                </div>
+                <div class="calendar-day-entries">
+                    {items_html}
+                </div>
+            </div>
+            """
+        return html
+
     for e in events:
         start_time = (
             e["start_time"].split(" ")[1] if " " in e["start_time"] else e["start_time"]
@@ -98,9 +158,6 @@ def render_calendar_events_html(events, show_date=False) -> str:
         )
 
         time_str = f'<span class="calendar-duration">{start_time} - {end_time}</span>'
-        if show_date:
-            date_part = e["start_time"].split(" ")[0]
-            time_str = f'<span class="calendar-date">{format_german_date(date_part)}</span>{time_str}'
 
         html += f"""
         <div class="calendar-item">
@@ -240,7 +297,7 @@ async def render_section(request: Request, tab: str, section_html: str):
     if request.headers.get("HX-Request") == "true":
         return HTMLResponse(content=section_html)
 
-    today_date = format_german_date(datetime.date.today(), long_format=True)
+    today_date = format_display_date(datetime.date.today(), long_format=True)
     return templates.TemplateResponse(
         request,
         "index.html",
@@ -282,14 +339,18 @@ async def get_tasks_items():
     if not tasks:
         html = "<div style='color: var(--text-muted); font-size: 14px; font-style: italic;'>No tasks logged yet.</div>"
 
+    today_str = datetime.date.today().strftime("%Y-%m-%d")
     for t in tasks:
         checked = "checked" if t["status"] == "completed" else ""
         tag_class = t["tag"] if t["tag"] else ""
-        due_str = (
-            f'<span class="task-due">Due: {format_german_date(t["due_date"])}</span>'
-            if t["due_date"]
-            else ""
-        )
+        is_overdue = t["due_date"] is not None and t["due_date"] < today_str and t["status"] != "completed"
+        due_str = ""
+        if t["due_date"]:
+            formatted_due = format_display_date(t["due_date"])
+            if is_overdue:
+                due_str = f'<span class="icon-text-pair"><span class="emoji-icon">⚠️</span><span class="task-due">Due: {formatted_due}</span></span>'
+            else:
+                due_str = f'<span class="task-due">Due: {formatted_due}</span>'
         desc_str = (
             f'<div class="task-desc">{t["description"]}</div>'
             if t["description"]
@@ -404,7 +465,7 @@ async def get_dashboard_tasks():
         is_overdue = t["due_date"] is not None and t["due_date"] < today_str
         due_str = ""
         if t["due_date"]:
-            formatted_due = format_german_date(t["due_date"])
+            formatted_due = format_display_date(t["due_date"])
             if is_overdue:
                 due_str = f'<span class="icon-text-pair"><span class="emoji-icon">⚠️</span><span class="task-due">Due: {formatted_due}</span></span>'
             else:
@@ -556,12 +617,19 @@ def get_exercise_progress(exercise_name: str) -> dict:
     first_weight = get_max_weight(logs[0]["sets"])
     current_weight = get_max_weight(logs[-1]["sets"])
 
-    first_weight_str = (
-        f"{first_weight} kg" if first_weight is not None else "Not yet logged"
-    )
-    current_weight_str = (
-        f"{current_weight} kg" if current_weight is not None else "Not yet logged"
-    )
+    if first_weight is None:
+        first_weight_str = "Not yet logged"
+    elif first_weight == 0:
+        first_weight_str = "Bodyweight"
+    else:
+        first_weight_str = f"{first_weight} kg"
+
+    if current_weight is None:
+        current_weight_str = "Not yet logged"
+    elif current_weight == 0:
+        current_weight_str = "Bodyweight"
+    else:
+        current_weight_str = f"{current_weight} kg"
 
     return {
         "exercise_name": exercise_name,
@@ -644,7 +712,7 @@ async def get_workouts_items():
         html = "<div style='color: var(--text-muted); font-size: 14px; font-style: italic;'>No workouts logged yet.</div>"
     else:
         for date, group in itertools.groupby(workouts, key=lambda w: w["date"]):
-            formatted_date = format_german_date(date)
+            formatted_date = format_display_date(date, with_weekday=True)
             items_html = ""
             for w in group:
                 try:
@@ -654,7 +722,11 @@ async def get_workouts_items():
 
                 sets_html = ""
                 for idx, s in enumerate(sets_data):
-                    sets_html += f'<span class="workout-set-badge">Set {idx + 1}: {s["reps"]}r @ {s["weight_kg"]}kg</span>'
+                    weight = s.get("weight_kg")
+                    if not weight or weight == 0:
+                        sets_html += f'<span class="workout-set-badge">Set {idx + 1}: {s["reps"]}r</span>'
+                    else:
+                        sets_html += f'<span class="workout-set-badge">Set {idx + 1}: {s["reps"]}r @ {weight}kg</span>'
 
                 notes_html = (
                     f'<div class="workout-notes">{w["notes"]}</div>' if w["notes"] else ""
@@ -764,7 +836,7 @@ async def get_habits_items():
             for i in range(84):
                 cell_date = monday_oldest + datetime.timedelta(days=i)
                 cell_date = get_period_start(cell_date, "daily")
-                formatted_date = format_german_date(cell_date)
+                formatted_date = format_display_date(cell_date)
                 date_str = cell_date.strftime("%Y-%m-%d")
 
                 is_pre = cell_date < created_date
@@ -790,7 +862,7 @@ async def get_habits_items():
                 is_pre = week_end < created_date
                 is_post = week_start > today
 
-                formatted_date = format_german_date(week_start)
+                formatted_date = format_display_date(week_start)
 
                 completed_in_week = False
                 for log_date_str in data.get("completed_dates", []):
@@ -823,7 +895,7 @@ async def get_habits_items():
                 is_pre = period_end < created_date
                 is_post = period_start > today
 
-                formatted_date = format_german_date(period_start)
+                formatted_date = format_display_date(period_start)
 
                 completed_in_period = False
                 for log_date_str in data.get("completed_dates", []):
@@ -857,7 +929,7 @@ async def get_habits_items():
                 is_pre = month_end < created_date
                 is_post = month_start > today
 
-                formatted_date = format_german_date(month_start)
+                formatted_date = format_display_date(month_start)
 
                 completed_in_month = False
                 for log_date_str in data.get("completed_dates", []):
@@ -942,11 +1014,20 @@ async def get_calendar_today():
         today_str = datetime.date.today().strftime("%Y-%m-%d")
         cal_data = get_calendar_events(today_str)
         events = cal_data.get("events", [])
+        
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        original_count = len(events)
+        filtered_events = [e for e in events if e.get("end_time") and e["end_time"] >= now_str]
+        
+        if original_count > 0 and len(filtered_events) == 0:
+            empty_msg = "All done for today."
+        else:
+            empty_msg = "No events scheduled."
     except Exception as e:
         return HTMLResponse(
             content=f"<div style='color: var(--accent-red)'>Error: {e}</div>"
         )
-    return HTMLResponse(content=render_calendar_events_html(events, show_date=False))
+    return HTMLResponse(content=render_calendar_events_html(filtered_events, show_date=False, empty_message=empty_msg))
 
 
 @app.post("/chat", response_class=HTMLResponse)

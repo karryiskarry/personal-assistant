@@ -200,8 +200,8 @@
         }
 
         .message-agent {
-            background-color: var(--bg-card);
-            border: 1px solid var(--border-subtle);
+            background-color: #18281e;
+            border: 1px solid rgba(255, 255, 255, 0.15);
             color: var(--text-primary);
             align-self: flex-start;
             border-bottom-left-radius: 4px;
@@ -762,13 +762,70 @@
             align-items: center;
             gap: 16px;
         }
-        .calendar-date {
+         .calendar-date {
             width: 90px;
             text-align: right;
         }
         .calendar-duration {
             width: 110px;
             text-align: right;
+        }
+
+        .calendar-day-group {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 20px 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            transition: var(--transition-smooth);
+        }
+
+        .calendar-day-group:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .calendar-day-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-subtle);
+            padding-bottom: 8px;
+            margin-bottom: 4px;
+        }
+
+        .calendar-day-date {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .calendar-day-entries {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .calendar-day-group .calendar-item {
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            padding: 8px 0 14px 0;
+            border-bottom: 1px dashed var(--border-subtle);
+        }
+
+        .calendar-day-group .calendar-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .calendar-item.past {
+            opacity: 0.5;
+        }
+
+        .calendar-day-group.past-day {
+            opacity: 0.5;
         }
 
         /* Animations */
@@ -979,7 +1036,7 @@
             
             <div class="chat-messages" id="chat-box">
                 <div class="message-bubble message-agent">
-                    Hello! I am your personal assistant. I can track your tasks, habits, and workouts, or answer any advisory queries. Try telling me "Log my squats 3x5 at 80kg" or "Show me my plan for today"!
+                    Here whenever you need me.
                 </div>
             </div>
 
@@ -1131,7 +1188,28 @@
                 }
             });
         }
-        document.body.addEventListener('htmx:afterOnLoad', updateActiveNav);
+        document.body.addEventListener('htmx:afterOnLoad', function(evt) {
+            updateActiveNav();
+            
+            // Scroll to today if we just finished loading calendar items
+            const requestPath = evt.detail.pathInfo ? evt.detail.pathInfo.requestPath : '';
+            if (requestPath === "/calendar/items" || (evt.detail.xhr && evt.detail.xhr.responseURL && evt.detail.xhr.responseURL.includes('/calendar/items'))) {
+                const todayGroup = document.getElementById('calendar-today-group');
+                if (todayGroup) {
+                    const header = document.querySelector('header');
+                    const headerHeight = header ? header.offsetHeight : 0;
+                    todayGroup.style.scrollMarginTop = headerHeight + 'px';
+                    todayGroup.scrollIntoView({ block: 'start' });
+                }
+            }
+
+            if (evt.detail.target && evt.detail.target.id === "content-area") {
+                const path = window.location.pathname;
+                if (path !== "/calendar") {
+                    window.scrollTo(0, 0);
+                }
+            }
+        });
         window.addEventListener('popstate', updateActiveNav);
 
         // Keyboard shortcut: Press '/' or 'Cmd/Ctrl + K' to focus chat input

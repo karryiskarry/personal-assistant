@@ -19,15 +19,17 @@ Two domain-specific Agent Skills (`household-planning`, `workout-planning`) are 
 ## Architecture
 
 - **Database layer** (`app/db.py`) — SQLite, six tables: tasks, habits, habit_logs, workout_logs, calendar_events, plan_exercises.
-- **Agent layer** (`app/agent.py`, `app/tools.py`) — Gemini-powered ADK agent with structured tools for every mutation (create/complete/delete, with explicit deletion confirmation), a read-only SQL query tool for advisory questions, and dynamic skill loading via a `before_agent_callback`.
+- **Agent layer** (`app/agent.py`, `app/tools.py`) — Gemini-powered ADK agent with structured tools for every mutation (create/complete/delete, with explicit deletion confirmation), a read-only SQL query tool for advisory questions, dynamic skill loading via a `before_agent_callback`, and a `McpToolset` connection to a local Calendar MCP server for real Google Calendar access.
+- **Calendar MCP server** (`app/mcp_servers/calendar_server.py`, `app/mcp_servers/calendar_auth.py`) — a `FastMCP` server run as a separate process over stdio, exposing a `list_events` tool backed by the real Google Calendar API via OAuth2 (`scripts/authorize_calendar.py` runs the one-time consent flow). Falls back to a mocked response set when `PERSONAL_ASSISTANT_CALENDAR_MOCK=true`, used in tests.
 - **Web layer** (`app/main.py`, `app/templates/`) — FastAPI + Jinja2 + HTMX, five navigable tabs (Dashboard, Tasks, Habits, Workouts, Calendar) with a persistent chat sidebar, served as a single `uvicorn` process — no Node/npm toolchain.
 
 Design decisions worth calling out:
 - Deterministic logic (thresholds, date math, warm-up set calculations, recurrence advancement) lives in code, never in model reasoning — the model is only used for genuine judgment calls.
 - Recurring tasks preserve history via `parent_task_id` lineage rather than mutating a single row in place.
 - The Dashboard tab aggregates "what's due today" via plain SQL — no LLM call on every tab visit.
-- Tests run against an isolated temporary SQLite database (`tests/conftest.py` patches `DB_PATH` per test) — never the live file, after a real incident where routine test runs silently wiped real active-exercise data.
-- The agent resolves names/descriptions to internal database IDs itself before any mutation or confirmation — it never asks the user to supply or look up a raw ID.
+- The chat assistant's calendar awareness is real (via the MCP server above), but the Dashboard and Calendar tab's visual widgets deliberately stay on a seeded mock dataset, queried directly with zero LLM involvement — keeping that deterministic aggregation path separate from the agent/MCP path is intentional, not a gap.
+- Tests run against an isolated temporary SQLite database (`tests/conftest.py` patches `DB_PATH` per test) — never the live file, after a real incident where routine test runs silently wiped real active-exercise data. The same isolation problem applies across process boundaries for MCP subprocess tests, solved via the `PERSONAL_ASSISTANT_DB_PATH`/`PERSONAL_ASSISTANT_CALENDAR_MOCK` environment variables rather than `monkeypatch`, which doesn't cross processes.
+- The agent resolves names/descriptions to internal database IDs itself before any mutation or confirmation — it never asks the user to supply or look up a raw ID. The same explicit-confirmation pattern applies to any plan-altering tool call (e.g. `sync_active_exercises`) based on assumed defaults, not just deletions.
 
 ## Features
 
@@ -38,7 +40,8 @@ Design decisions worth calling out:
 - Per-habit completion heatmap across all four habit frequencies (daily/weekly/biweekly/monthly), each with a frequency-appropriate grid shape and time window
 - Workout history grouped into per-date session cards, rather than a flat exercise-by-exercise list
 - Recurring task support with safe undo (no duplicate/orphaned instances)
-- Explicit deletion confirmation on all destructive actions
+- Real Google Calendar integration via a custom MCP server with OAuth2 authentication
+- Explicit deletion confirmation on all destructive actions, extended to any plan-altering tool call based on assumed defaults
 - Medical disclaimers on fitness advice; all advisory answers grounded in actual logged data
 
 ## Requirements
@@ -102,6 +105,6 @@ personal-assistant/
 
 ## Known Limitations / Planned Enhancements
 
-- Calendar is a mock/seeded dataset — no real Google Calendar integration yet (would require an MCP server)
+- The chat assistant reads your real Google Calendar via an MCP server with OAuth2 — but the Dashboard and Calendar tab's visual widgets still display a seeded mock dataset rather than that same real data; extending them is a scoped next step
 - Exercise-name matching for plan/progress tracking is exact-string only (no fuzzy matching)
 - No proactive/ambient nudges — the agent is reactive to the dashboard or chat, not scheduled

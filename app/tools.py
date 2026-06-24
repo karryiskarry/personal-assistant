@@ -451,7 +451,7 @@ def get_calendar_events(date: str) -> dict:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, title, start_time, end_time FROM calendar_events WHERE start_time LIKE ?",
+            "SELECT id, title, start_time, end_time FROM calendar_events WHERE start_time LIKE ? ORDER BY start_time ASC",
             (f"{date}%",),
         )
         rows = cursor.fetchall()
@@ -712,3 +712,30 @@ def sync_active_exercises(active_exercise_names: list[str]) -> dict:
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+def resolve_weekday_date(weekday_name: str) -> dict:
+    """Resolves a weekday name to its nearest date (YYYY-MM-DD) on or after today.
+
+    Args:
+        weekday_name: The name of the weekday (e.g. 'Monday', 'Saturday').
+    """
+    weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+    name_clean = weekday_name.strip().lower()
+    if name_clean not in weekdays:
+        raise ValueError(f"Invalid weekday name '{weekday_name}'. Must be one of Monday-Sunday.")
+
+    target_idx = weekdays.index(name_clean)
+    today = datetime.date.today()
+    today_idx = today.weekday()
+
+    days_ahead = target_idx - today_idx
+    if days_ahead < 0:
+        days_ahead += 7
+
+    target_date = today + datetime.timedelta(days=days_ahead)
+    return {
+        "date": target_date.strftime("%Y-%m-%d"),
+        "weekday": name_clean.capitalize()
+    }
+
