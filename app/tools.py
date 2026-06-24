@@ -233,6 +233,46 @@ def complete_task(task_id: int) -> dict:
         return {"status": "error", "message": str(e)}
 
 
+def get_period_start(date: datetime.date, frequency: str, anchor: datetime.date | None = None) -> datetime.date:
+    frequency = frequency.lower().strip()
+    if frequency == "daily":
+        return date
+    elif frequency == "weekly":
+        return date - datetime.timedelta(days=date.weekday())
+    elif frequency == "biweekly":
+        if anchor is None:
+            raise ValueError("Anchor is required for biweekly frequency")
+        idx = (date - anchor).days // 14
+        return anchor + datetime.timedelta(days=idx * 14)
+    elif frequency == "monthly":
+        return date.replace(day=1)
+    else:
+        raise ValueError(f"Unknown frequency: {frequency}")
+
+
+def get_previous_period_start(period_start: datetime.date, frequency: str) -> datetime.date:
+    frequency = frequency.lower().strip()
+    if frequency == "daily":
+        return period_start - datetime.timedelta(days=1)
+    elif frequency == "weekly":
+        return period_start - datetime.timedelta(days=7)
+    elif frequency == "biweekly":
+        return period_start - datetime.timedelta(days=14)
+    elif frequency == "monthly":
+        return (period_start - datetime.timedelta(days=1)).replace(day=1)
+    else:
+        raise ValueError(f"Unknown frequency: {frequency}")
+
+
+def get_month_start_relative(base_month_start: datetime.date, offset: int) -> datetime.date:
+    year = base_month_start.year
+    month = base_month_start.month
+    total_months = year * 12 + (month - 1) + offset
+    new_year = total_months // 12
+    new_month = (total_months % 12) + 1
+    return datetime.date(new_year, new_month, 1)
+
+
 def create_habit(name: str, frequency: str, description: str | None = None) -> dict:
     """Creates a new habit to track going forward.
 
@@ -243,14 +283,16 @@ def create_habit(name: str, frequency: str, description: str | None = None) -> d
 
     Args:
         name: The name of the habit (e.g. 'Flossing', 'Morning run').
-        frequency: How often the habit recurs: 'daily' or 'weekly'.
+        frequency: How often the habit recurs: 'daily' (e.g. "every day"),
+            'weekly' (e.g. "every week"), 'biweekly' (e.g. "every 2 weeks"),
+            or 'monthly' (e.g. "once a month").
         description: An optional description of the habit (None if not provided).
     """
     freq = frequency.lower().strip() if frequency else ""
-    if freq not in ("daily", "weekly"):
+    if freq not in ("daily", "weekly", "biweekly", "monthly"):
         return {
             "status": "error",
-            "message": f"Invalid frequency '{frequency}'. Must be 'daily' or 'weekly'.",
+            "message": f"Invalid frequency '{frequency}'. Must be 'daily', 'weekly', 'biweekly', or 'monthly'.",
         }
 
     try:
@@ -424,15 +466,30 @@ def get_habit_streaks() -> dict:
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, frequency FROM habits")
+        cursor.execute(
+            "SELECT id, name, frequency, created_at FROM habits "
+            "ORDER BY CASE frequency WHEN 'daily' THEN 0 WHEN 'weekly' THEN 1 WHEN 'biweekly' THEN 2 WHEN 'monthly' THEN 3 ELSE 4 END, name ASC"
+        )
         habits = cursor.fetchall()
 
         streaks = {}
         today = datetime.date.today()
+        cutoff_date = (today - datetime.timedelta(days=83)).strftime("%Y-%m-%d")
 
         for h in habits:
             habit_id = h["id"]
             name = h["name"]
+
+            created_at_str = h["created_at"] or ""
+            if " " in created_at_str:
+                created_at_str = created_at_str.split(" ")[0]
+            try:
+                created_date = datetime.datetime.strptime(created_at_str, "%Y-%m-%d").date()
+            except Exception:
+                created_date = datetime.date.min
+
+            freq = h["frequency"].lower().strip()
+
             cursor.execute(
                 "SELECT date FROM habit_logs WHERE habit_id = ? ORDER BY date DESC",
                 (habit_id,),
@@ -444,22 +501,52 @@ def get_habit_streaks() -> dict:
 
             streak = 0
             if logs:
-                current_check = today
-                if (
-                    current_check not in logs
-                    and (current_check - datetime.timedelta(days=1)) in logs
-                ):
-                    current_check = today - datetime.timedelta(days=1)
+                log_periods = set()
+                for log_date in logs:
+                    log_periods.add(get_period_start(log_date, freq, created_date))
 
-                while current_check in logs:
+                current_period = get_period_start(today, freq, created_date)
+
+                if current_period in log_periods:
+                    current_check = current_period
+                else:
+                    prev_period = get_previous_period_start(current_period, freq)
+                    if prev_period in log_periods:
+                        current_check = prev_period
+                    else:
+                        current_check = current_period
+
+                while current_check in log_periods:
                     streak += 1
-                    current_check -= datetime.timedelta(days=1)
+                    current_check = get_previous_period_start(current_check, freq)
+
+            # Query completed dates for heatmap (last 84 days, or last ~365 days for monthly)
+            if freq == "monthly":
+                habit_cutoff_date = (today - datetime.timedelta(days=365)).strftime("%Y-%m-%d")
+            else:
+                habit_cutoff_date = cutoff_date
+
+            cursor.execute(
+                "SELECT date FROM habit_logs WHERE habit_id = ? AND date >= ? ORDER BY date DESC",
+                (habit_id, habit_cutoff_date),
+            )
+            recent_logs = [row["date"] for row in cursor.fetchall()]
+
+            streak_units = {
+                "daily": "day",
+                "weekly": "week",
+                "biweekly": "biweekly",
+                "monthly": "month",
+            }
 
             streaks[name] = {
                 "habit_id": habit_id,
                 "frequency": h["frequency"],
                 "current_streak": streak,
+                "streak_unit": streak_units.get(freq, "day"),
                 "last_logged": logs[0].strftime("%Y-%m-%d") if logs else None,
+                "created_at": h["created_at"],
+                "completed_dates": recent_logs,
             }
         conn.close()
         return {"status": "success", "streaks": streaks}
@@ -586,15 +673,19 @@ def sync_active_exercises(active_exercise_names: list[str]) -> dict:
             {name.strip() for name in active_exercise_names if name and name.strip()}
         )
 
+        if not normalized_names:
+            conn.close()
+            return {
+                "status": "error",
+                "message": "sync_active_exercises cannot be called with an empty list. If you wish to deactivate a single exercise, call set_exercise_active instead.",
+            }
+
         # Deactivate all active exercises not present in the new plan
-        if normalized_names:
-            placeholders = ",".join(["?"] * len(normalized_names))
-            cursor.execute(
-                f"UPDATE plan_exercises SET active = 0 WHERE active = 1 AND exercise_name NOT IN ({placeholders})",
-                tuple(normalized_names),
-            )
-        else:
-            cursor.execute("UPDATE plan_exercises SET active = 0 WHERE active = 1")
+        placeholders = ",".join(["?"] * len(normalized_names))
+        cursor.execute(
+            f"UPDATE plan_exercises SET active = 0 WHERE active = 1 AND exercise_name NOT IN ({placeholders})",
+            tuple(normalized_names),
+        )
 
         # Activate each specified exercise (updating active status, inserting if not present)
         for name in normalized_names:

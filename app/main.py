@@ -11,7 +11,13 @@ from google.genai import types
 
 from .agent import root_agent
 from .db import get_db_connection, get_readonly_db_connection
-from .tools import advance_recurring_task, get_calendar_events, get_habit_streaks
+from .tools import (
+    advance_recurring_task,
+    get_calendar_events,
+    get_habit_streaks,
+    get_month_start_relative,
+    get_period_start,
+)
 
 app = FastAPI(title="Personal Assistant Dashboard")
 
@@ -31,7 +37,7 @@ def format_german_date(date_val, long_format=False) -> str:
     """
     if not date_val:
         return ""
-    
+
     # Try parsing string to date object
     if isinstance(date_val, str):
         # Could be YYYY-MM-DD or YYYY-MM-DD HH:MM:SS
@@ -91,10 +97,10 @@ def render_calendar_events_html(events, show_date=False) -> str:
             e["end_time"].split(" ")[1] if " " in e["end_time"] else e["end_time"]
         )
 
-        time_str = f'<span class="icon-text-pair"><span class="emoji-icon clock-emoji">⏰</span><span>{start_time} - {end_time}</span></span>'
+        time_str = f'<span class="calendar-duration">{start_time} - {end_time}</span>'
         if show_date:
             date_part = e["start_time"].split(" ")[0]
-            time_str = f'<span class="icon-text-pair"><span class="emoji-icon calendar-emoji">📅</span><span>{format_german_date(date_part)}</span></span>{time_str}'
+            time_str = f'<span class="calendar-date">{format_german_date(date_part)}</span>{time_str}'
 
         html += f"""
         <div class="calendar-item">
@@ -111,7 +117,7 @@ def get_dashboard_section_html() -> str:
         <!-- Today's Schedule -->
         <div class="section-card">
             <div class="section-title">
-                <span class="icon-text-pair"><span class="emoji-icon calendar-emoji">📅</span><span>Today's Schedule</span></span>
+                <span>Today's Schedule</span>
             </div>
             <div class="calendar-list"
                  hx-get="/calendar/today"
@@ -124,7 +130,7 @@ def get_dashboard_section_html() -> str:
         <!-- Open & Overdue Tasks -->
         <div class="section-card">
             <div class="section-title">
-                <span class="icon-text-pair"><span class="emoji-icon">⚠️</span><span>Open & Overdue Tasks</span></span>
+                <span>Open & Overdue Tasks</span>
             </div>
             <div class="task-list"
                  hx-get="/dashboard/tasks"
@@ -137,7 +143,7 @@ def get_dashboard_section_html() -> str:
         <!-- Habits To Do Today -->
         <div class="section-card">
             <div class="section-title">
-                <span class="icon-text-pair"><span class="emoji-icon">🔥</span><span>Habits To Do Today</span></span>
+                <span>Habits To Do Today</span>
             </div>
             <div class="habit-grid"
                  hx-get="/dashboard/habits"
@@ -395,11 +401,14 @@ async def get_dashboard_tasks():
     for t in tasks:
         checked = "checked" if t["status"] == "completed" else ""
         tag_class = t["tag"] if t["tag"] else ""
-        due_str = (
-            f'<span class="task-due">Due: {format_german_date(t["due_date"])}</span>'
-            if t["due_date"]
-            else ""
-        )
+        is_overdue = t["due_date"] is not None and t["due_date"] < today_str
+        due_str = ""
+        if t["due_date"]:
+            formatted_due = format_german_date(t["due_date"])
+            if is_overdue:
+                due_str = f'<span class="icon-text-pair"><span class="emoji-icon">⚠️</span><span class="task-due">Due: {formatted_due}</span></span>'
+            else:
+                due_str = f'<span class="task-due">Due: {formatted_due}</span>'
         desc_str = (
             f'<div class="task-desc">{t["description"]}</div>'
             if t["description"]
@@ -475,12 +484,13 @@ async def get_dashboard_habits():
         btn_attr = (
             f'class="btn-log-habit" hx-post="/habits/{habit_id}/log" hx-swap="none"'
         )
+        streak_unit = data.get("streak_unit", "day")
         html += f"""
         <div class="habit-item">
             <div class="habit-info">
                 <div class="habit-name">{name}</div>
-                <div class="habit-desc">{data["frequency"]} habit</div>
-                <div class="habit-streak"><span class="icon-text-pair"><span class="emoji-icon">🔥</span><span>{data["current_streak"]} day streak</span></span></div>
+                <div class="habit-desc">{data["frequency"]}</div>
+                <div class="habit-streak"><span class="icon-text-pair"><span class="emoji-icon">🔥</span><span>{data["current_streak"]} {streak_unit} streak</span></span></div>
             </div>
             <button {btn_attr}>Log Today</button>
         </div>
@@ -627,41 +637,56 @@ async def get_workouts_items():
             content=f"<div style='color: var(--accent-red)'>Error: {e}</div>"
         )
 
+    import itertools
+
     html = ""
     if not workouts:
         html = "<div style='color: var(--text-muted); font-size: 14px; font-style: italic;'>No workouts logged yet.</div>"
+    else:
+        for date, group in itertools.groupby(workouts, key=lambda w: w["date"]):
+            formatted_date = format_german_date(date)
+            items_html = ""
+            for w in group:
+                try:
+                    sets_data = json.loads(w["sets"])
+                except Exception:
+                    sets_data = []
 
-    for w in workouts:
-        try:
-            sets_data = json.loads(w["sets"])
-        except Exception:
-            sets_data = []
+                sets_html = ""
+                for idx, s in enumerate(sets_data):
+                    sets_html += f'<span class="workout-set-badge">Set {idx + 1}: {s["reps"]}r @ {s["weight_kg"]}kg</span>'
 
-        sets_html = ""
-        for idx, s in enumerate(sets_data):
-            sets_html += f'<span class="workout-set-badge">Set {idx + 1}: {s["reps"]}r @ {s["weight_kg"]}kg</span>'
+                notes_html = (
+                    f'<div class="workout-notes">{w["notes"]}</div>' if w["notes"] else ""
+                )
 
-        notes_html = (
-            f'<div class="workout-notes">{w["notes"]}</div>' if w["notes"] else ""
-        )
+                items_html += f"""
+                <div class="workout-item">
+                    <div class="workout-header">
+                        <div class="workout-exercise">{w["exercise"]}</div>
+                        <button class="btn-delete"
+                                hx-delete="/workouts/{w["id"]}"
+                                hx-swap="outerHTML"
+                                hx-target="closest .workout-item"
+                                hx-confirm="Are you sure you want to delete this workout log?">🗑️</button>
+                    </div>
+                    <div class="workout-sets">
+                        {sets_html}
+                    </div>
+                    {notes_html}
+                </div>
+                """
 
-        html += f"""
-        <div class="workout-item">
-            <div class="workout-header">
-                <div class="workout-exercise">{w["exercise"]}</div>
-                <div class="workout-date">{format_german_date(w["date"])}</div>
+            html += f"""
+            <div class="workout-session-card" hx-on::after-swap="if (this.querySelector('.workout-session-entries').children.length === 0) {{ this.remove(); }}">
+                <div class="workout-session-header">
+                    <div class="workout-session-date">{formatted_date}</div>
+                </div>
+                <div class="workout-session-entries">
+                    {items_html}
+                </div>
             </div>
-            <div class="workout-sets">
-                {sets_html}
-            </div>
-            {notes_html}
-            <button class="btn-delete"
-                    hx-delete="/workouts/{w["id"]}"
-                    hx-swap="outerHTML"
-                    hx-target="closest .workout-item"
-                    hx-confirm="Are you sure you want to delete this workout log?">🗑️</button>
-        </div>
-        """
+            """
     return HTMLResponse(content=html)
 
 
@@ -707,6 +732,10 @@ async def get_habits_items():
             content=f"<div style='color: var(--accent-red)'>Error: {streaks_data.get('message')}</div>"
         )
 
+    today = datetime.date.today()
+    monday_current = today - datetime.timedelta(days=today.weekday())
+    monday_oldest = monday_current - datetime.timedelta(weeks=11)
+
     for name, data in streaks_data["streaks"].items():
         habit_id = data["habit_id"]
         completed = habit_id in logged_today
@@ -718,12 +747,147 @@ async def get_habits_items():
         )
         btn_text = "Completed" if completed else "Log Today"
 
+        # Parse habit created_at date
+        created_at_str = data.get("created_at") or ""
+        if " " in created_at_str:
+            created_at_str = created_at_str.split(" ")[0]
+        try:
+            created_date = datetime.datetime.strptime(created_at_str, "%Y-%m-%d").date()
+        except Exception:
+            created_date = datetime.date.min
+
+        # Generate heatmap HTML
+        freq = data["frequency"].lower().strip()
+        heatmap_html = ""
+        if freq == "daily":
+            day_cells = []
+            for i in range(84):
+                cell_date = monday_oldest + datetime.timedelta(days=i)
+                cell_date = get_period_start(cell_date, "daily")
+                formatted_date = format_german_date(cell_date)
+                date_str = cell_date.strftime("%Y-%m-%d")
+
+                is_pre = cell_date < created_date
+                is_post = cell_date > today
+
+                if is_post:
+                    day_cells.append(f'<span class="heatmap-cell state-na" title="{formatted_date}"></span>')
+                elif date_str in data.get("completed_dates", []):
+                    day_cells.append(f'<span class="heatmap-cell state-completed" title="{formatted_date}"></span>')
+                elif is_pre:
+                    day_cells.append(f'<span class="heatmap-cell state-na" title="{formatted_date}"></span>')
+                else:
+                    day_cells.append(f'<span class="heatmap-cell state-missed" title="{formatted_date}"></span>')
+
+            heatmap_html = f'<div class="habit-heatmap daily">{"".join(day_cells)}</div>'
+        elif freq == "weekly":
+            week_cells = []
+            for c in range(12):
+                week_start = monday_oldest + datetime.timedelta(weeks=c)
+                week_start = get_period_start(week_start, "weekly")
+                week_end = week_start + datetime.timedelta(days=6)
+
+                is_pre = week_end < created_date
+                is_post = week_start > today
+
+                formatted_date = format_german_date(week_start)
+
+                completed_in_week = False
+                for log_date_str in data.get("completed_dates", []):
+                    try:
+                        log_date = datetime.datetime.strptime(log_date_str, "%Y-%m-%d").date()
+                        if week_start <= log_date <= week_end:
+                            completed_in_week = True
+                            break
+                    except Exception:
+                        continue
+
+                if is_post:
+                    week_cells.append(f'<span class="heatmap-cell state-na" title="{formatted_date}"></span>')
+                elif completed_in_week:
+                    week_cells.append(f'<span class="heatmap-cell state-completed" title="{formatted_date}"></span>')
+                elif is_pre:
+                    week_cells.append(f'<span class="heatmap-cell state-na" title="{formatted_date}"></span>')
+                else:
+                    week_cells.append(f'<span class="heatmap-cell state-missed" title="{formatted_date}"></span>')
+
+            heatmap_html = f'<div class="habit-heatmap weekly">{"".join(week_cells)}</div>'
+        elif freq == "biweekly":
+            biweekly_cells = []
+            current_period_start = get_period_start(today, "biweekly", created_date)
+            for c in range(6):
+                period_start = current_period_start - datetime.timedelta(days=(5 - c) * 14)
+                period_start = get_period_start(period_start, "biweekly", created_date)
+                period_end = period_start + datetime.timedelta(days=13)
+
+                is_pre = period_end < created_date
+                is_post = period_start > today
+
+                formatted_date = format_german_date(period_start)
+
+                completed_in_period = False
+                for log_date_str in data.get("completed_dates", []):
+                    try:
+                        log_date = datetime.datetime.strptime(log_date_str, "%Y-%m-%d").date()
+                        if period_start <= log_date <= period_end:
+                            completed_in_period = True
+                            break
+                    except Exception:
+                        continue
+
+                if is_post:
+                    biweekly_cells.append(f'<span class="heatmap-cell state-na" title="{formatted_date}"></span>')
+                elif completed_in_period:
+                    biweekly_cells.append(f'<span class="heatmap-cell state-completed" title="{formatted_date}"></span>')
+                elif is_pre:
+                    biweekly_cells.append(f'<span class="heatmap-cell state-na" title="{formatted_date}"></span>')
+                else:
+                    biweekly_cells.append(f'<span class="heatmap-cell state-missed" title="{formatted_date}"></span>')
+
+            heatmap_html = f'<div class="habit-heatmap weekly">{"".join(biweekly_cells)}</div>'
+        elif freq == "monthly":
+            monthly_cells = []
+            current_month_start = get_period_start(today, "monthly")
+            for c in range(12):
+                month_start = get_month_start_relative(current_month_start, c - 11)
+                month_start = get_period_start(month_start, "monthly")
+                next_month_start = get_month_start_relative(month_start, 1)
+                month_end = next_month_start - datetime.timedelta(days=1)
+
+                is_pre = month_end < created_date
+                is_post = month_start > today
+
+                formatted_date = format_german_date(month_start)
+
+                completed_in_month = False
+                for log_date_str in data.get("completed_dates", []):
+                    try:
+                        log_date = datetime.datetime.strptime(log_date_str, "%Y-%m-%d").date()
+                        if month_start <= log_date <= month_end:
+                            completed_in_month = True
+                            break
+                    except Exception:
+                        continue
+
+                if is_post:
+                    monthly_cells.append(f'<span class="heatmap-cell state-na" title="{formatted_date}"></span>')
+                elif completed_in_month:
+                    monthly_cells.append(f'<span class="heatmap-cell state-completed" title="{formatted_date}"></span>')
+                elif is_pre:
+                    monthly_cells.append(f'<span class="heatmap-cell state-na" title="{formatted_date}"></span>')
+                else:
+                    monthly_cells.append(f'<span class="heatmap-cell state-missed" title="{formatted_date}"></span>')
+
+            heatmap_html = f'<div class="habit-heatmap weekly">{"".join(monthly_cells)}</div>'
+
+        streak_unit = data.get("streak_unit", "day")
         html += f"""
         <div class="habit-item">
             <div class="habit-info">
                 <div class="habit-name">{name}</div>
-                <div class="habit-desc">{data["frequency"]} habit</div>
-                <div class="habit-streak"><span class="icon-text-pair"><span class="emoji-icon">🔥</span><span>{data["current_streak"]} day streak</span></span></div>
+                <div class="habit-desc">{data["frequency"]}</div>
+                <div class="habit-streak"><span class="icon-text-pair"><span class="emoji-icon">🔥</span><span>{data["current_streak"]} {streak_unit} streak</span></span></div>
+                {heatmap_html}
             </div>
             <button {btn_attr}>{btn_text}</button>
         </div>

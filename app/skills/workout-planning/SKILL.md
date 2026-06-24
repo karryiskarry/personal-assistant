@@ -21,7 +21,9 @@ You are utilizing the specialized `workout-planning` skill. Use the following do
   - How many days a week they want to train.
   - What workout split they prefer (e.g., Push/Pull/Legs, Upper/Lower, or Full Body).
   - Their primary fitness goals (strength, hypertrophy, endurance).
-- **Active Exercise Synchronization**: When creating or restructuring a weekly workout split/plan, you MUST identify all unique exercise names included in the new plan, and call the `sync_active_exercises` tool exactly once with the complete list of exercise names in the new plan. This synchronizes the active exercise list and deactivates any old exercises.
+- **Active Exercise Management & Safety Guard**:
+  - To **add, remove, activate, or deactivate a single exercise** from the existing plan, you MUST call the `set_exercise_active` tool. Do NOT use `sync_active_exercises` for this as it will deactivate all other exercises. Example: "also track deadlifts" or "add bench press to my active exercises" -> call `set_exercise_active(exercise_name="Deadlift", active=True)`. "drop pistol squats" or "deactivate squats" -> call `set_exercise_active(exercise_name="Pistol Squats", active=False)`.
+  - Use `sync_active_exercises` **only** when the user requests a complete restructuring or replacement of their entire plan with a new set of exercises. Example: "structure my new push/pull/legs week as Bench Press, Deadlift, Squats" -> call `sync_active_exercises(active_exercise_names=["Bench Press", "Deadlift", "Squats"])`.
 
 
 ## 2. Reading Workout History & Grounding

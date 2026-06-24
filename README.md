@@ -98,7 +98,7 @@ personal-assistant/
 
 ## Known Limitations / Planned Enhancements
 
-- Per-habit completion heatmap (specced, not yet implemented)
+- Per-habit completion heatmap (implemented)
 - Calendar is a mock/seeded dataset — no real Google Calendar integration yet (would require an MCP server)
 - Exercise-name matching for plan/progress tracking is exact-string only (no fuzzy matching)
 - No proactive/ambient nudges — the agent is reactive to the dashboard or chat, not scheduled

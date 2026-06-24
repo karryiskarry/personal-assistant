@@ -72,9 +72,33 @@ Implemented a pure arithmetic `calculate_warmup_sets` tool with zero LLM math in
   - **Automatic Nav Link Syncing**: Registered event listeners on `htmx:afterOnLoad` and `popstate` to synchronize active nav pill classes dynamically using `window.location.pathname`.
 
 ### 5. Task Creation Default Due Date
+- **Habit Completion Heatmap**: Designed and built a server-rendered 12-week habit completion heatmap in the Habits tab. Daily habits render a 12x7 Monday-start grid using CSS grid (`grid-auto-flow: column`). Weekly habits render a single row of 12 cells. Completed cells are filled with solid antique gold (`var(--primary)`). Incomplete in-range cells (`state-missed`) use a visible border (`rgba(255, 255, 255, 0.18)`) and faint background fill (`rgba(255, 255, 255, 0.06)`) to clearly stand out. Out-of-range cells (`state-na`) render with a faint border (`rgba(255, 255, 255, 0.06)`) and no background fill, preserving visual cohesiveness. Corrected cell evaluation precedence to ensure matching logged completions always render as state-completed even if they occur before the habit's created_at date. Added native tooltip hovers using German dates on each cell. Implemented `test_get_habit_streaks_heatmap_data` unit test and validated layout page rendering with `verify_heatmap.py`. To optimize screen space, configured `.habit-grid` to display as a 2-column layout (`grid-template-columns: 1fr 1fr; gap: 24px`) by default, collapsing responsively to `1fr` below `768px`. Added explicit CASE-based SQL ordering inside `get_habit_streaks()` to group daily habits first, followed by weekly habits, sorting alphabetically by name within each.
 - **Today Default**: Modified the `create_task` tool function in `app/tools.py` to default the `due_date` parameter to the current local day in `YYYY-MM-DD` format if it is falsy or omitted.
 - **Robust Argument Parsing**: Allowed default optional parameters in `create_task`'s Python signature so that it can be invoked with fewer arguments, making it backward compatible and easier to call.
 - **Verification Unit Test**: Implemented `tests/unit/test_tools.py` to assert that when a task is created without specifying a `due_date`, the database successfully stores the current local date.
+- **Markdown Table Layout Fix**: Configured markdown tables inside chat bubbles (`.message-agent`) to use `table-layout: fixed;` and `word-wrap: break-word; overflow-wrap: break-word;` on table cell elements (`th, td`). This prevents table overflow and wraps text to fit perfectly within the bubbles.
+- **Biweekly/Monthly Habit Support**: Extended habit frequency configuration, streak calculations, and heatmap rendering to support `biweekly` and `monthly` frequencies:
+  - Added a generalized bucketing helper `get_period_start` in `app/tools.py` for uniform date period calculations.
+  - Generalized streak calculation with grace-period handling and added `streak_unit` mapping support.
+  - Set up a 365-day query window for monthly habits compared to 84-day windows for daily/weekly/biweekly habits.
+  - Rendered 6 cells for biweekly habits and 12 cells for monthly habits, reusing the weekly grid layout styling.
+  - Implemented unit tests for all period bucket types, biweekly/monthly streaks (grace-period and broken), and query windows.
+- **Test Database Isolation**: Added [conftest.py](file:///Users/Karina.Peppler/Library/CloudStorage/OneDrive-SenacorTechnologiesAG/agy2-projects/personal_assistant/personal-assistant/tests/conftest.py) to set up automatic SQLite database isolation for the entire test suite:
+  - Prevents the test suite from running against or modifying the live `personal_assistant.db`.
+  - Automatically redirects all imports and initial test collections to a temporary SQLite db.
+  - Creates a fresh, isolated temporary database path and schema per test execution, cleaning it up after each test runs.
+  - Restored the active status of real plan exercises on the live database.
+- **Workouts History Restructuring**: Restructured the workouts history view into date-grouped session cards:
+  - Groups adjacent same-date workout logs using `itertools.groupby()`.
+  - Renders a single `.workout-session-card` per date showing the German-formatted date header once at the top of the session.
+  - Displays each exercise within that session as a nested `.workout-item` with subtle inner dividers, avoiding visual clutter.
+  - Implemented an `hx-on::after-swap` handler on the session card that automatically detects when a deletion leaves a session card empty and removes the entire empty session card from the DOM.
+- **Scroll Height Adjustments**: Removed hardcoded `max-height` and `overflow-y: auto` limitations on `.task-list` and `.workout-list` in [index.html](file:///Users/Karina.Peppler/Library/CloudStorage/OneDrive-SenacorTechnologiesAG/agy2-projects/personal_assistant/personal-assistant/app/templates/index.html#L357-L362), letting lists grow to their natural heights and allowing standard browser-level scrolling.
+- **UI Card Tweaks & Overdue Alerts**: Applied minor layout adjustments:
+  - Removed the `⚠️` icon from the dashboard's "Open & Overdue Tasks" section header.
+  - Inserted the `⚠️` warning emoji inline for overdue tasks in `get_dashboard_tasks()`, prepending it to the due date badge using the standard `.icon-text-pair` wrapper.
+  - Removed the redundant word "habit" from the frequency descriptor inside both uncompleted dashboard habits and the list items in the Habits tab.
+- **Import Bug Fix & Endpoint Integration Testing**: Fixed a missing import issue for `get_period_start` in [main.py](file:///Users/Karina.Peppler/Library/CloudStorage/OneDrive-SenacorTechnologiesAG/agy2-projects/personal_assistant/personal-assistant/app/main.py#L14) that was causing 500 NameError responses on `/habits/items`. Created a new integration test [test_app.py](file:///Users/Karina.Peppler/Library/CloudStorage/OneDrive-SenacorTechnologiesAG/agy2-projects/personal_assistant/personal-assistant/tests/integration/test_app.py) to perform end-to-end FastAPI endpoint calls using `TestClient` to assert successful HTML responses.
 
 ---
 
