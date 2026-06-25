@@ -37,16 +37,7 @@ class MockEventsResource:
     def execute(self):
         op = getattr(self, "_operation", "list")
         if op == "list":
-            return {
-                "items": [
-                    {
-                        "id": "mock_event_1",
-                        "summary": "MCP Integration Test Event",
-                        "start": {"dateTime": "2099-01-15T10:00:00Z"},
-                        "end": {"dateTime": "2099-01-15T11:00:00Z"}
-                    }
-                ]
-            }
+            return {"items": self._list_items(self._kwargs.get("timeMin"), self._kwargs.get("timeMax"))}
         elif op in ("insert", "patch"):
             body = self._kwargs.get("body", {})
             return {
@@ -58,6 +49,67 @@ class MockEventsResource:
         elif op == "delete":
             return {}
         return {}
+
+    @staticmethod
+    def _list_items(time_min, time_max):
+        """Returns mock events for a list() call's [time_min, time_max] window.
+
+        The integration tests query the fixed year 2099 specifically to stay
+        deterministic, so that exact event is preserved when the window falls
+        there. Any other window (e.g. "today" during a live demo recording)
+        gets a believable, relative-to-now demo schedule instead, since the
+        Dashboard/Calendar tab would otherwise just show that 2099 event
+        regardless of what day was actually requested.
+        """
+        try:
+            window_start = datetime.datetime.fromisoformat(time_min) if time_min else None
+        except ValueError:
+            window_start = None
+
+        if window_start and window_start.year == 2099:
+            return [
+                {
+                    "id": "mock_event_1",
+                    "summary": "MCP Integration Test Event",
+                    "start": {"dateTime": "2099-01-15T10:00:00Z"},
+                    "end": {"dateTime": "2099-01-15T11:00:00Z"},
+                }
+            ]
+
+        try:
+            window_end = datetime.datetime.fromisoformat(time_max) if time_max else None
+        except ValueError:
+            window_end = None
+
+        now = datetime.datetime.now().astimezone()
+
+        def at(day_offset, hour, minute=0):
+            return (now + datetime.timedelta(days=day_offset)).replace(
+                hour=hour, minute=minute, second=0, microsecond=0
+            )
+
+        demo_events = [
+            ("Morning Standup", at(0, 9, 0), at(0, 9, 15)),
+            ("Deep Work: Capstone Demo Prep", at(0, 13, 0), at(0, 15, 0)),
+            ("Gym Session", at(0, 17, 30), at(0, 18, 30)),
+            ("Dentist Appointment", at(1, 10, 0), at(1, 11, 0)),
+            ("Team Retro", at(2, 14, 0), at(2, 14, 30)),
+            ("Birthday Dinner", at(4, 19, 0), at(4, 21, 0)),
+        ]
+
+        items = []
+        for i, (title, start, end) in enumerate(demo_events):
+            if window_start and window_end and not (window_start <= start <= window_end):
+                continue
+            items.append(
+                {
+                    "id": f"mock_demo_event_{i}",
+                    "summary": title,
+                    "start": {"dateTime": start.isoformat()},
+                    "end": {"dateTime": end.isoformat()},
+                }
+            )
+        return items
 
 class MockGoogleCalendarClient:
     def events(self):
