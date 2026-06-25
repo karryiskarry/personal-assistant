@@ -159,5 +159,16 @@ def delete_event(event_id: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
+# FastMCP names each tool's auto-generated argument model
+# f"{func.__name__}Arguments" (e.g. "create_eventArguments") and Pydantic
+# surfaces that as the JSON schema's top-level "title" — sitting right next
+# to the real tool name ("create_event") in the function declaration Gemini
+# sees. This caused a live misfire where Gemini called "create_eventArguments"
+# instead of "create_event", since both strings were present in the same
+# declaration. Stripping the redundant title removes the ambiguity.
+for _tool in mcp._tool_manager.list_tools():
+    _tool.parameters.pop("title", None)
+
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")
