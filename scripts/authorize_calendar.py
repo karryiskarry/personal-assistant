@@ -8,7 +8,7 @@ PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 CREDENTIALS_PATH = os.path.join(PROJECT_ROOT, "credentials.json")
 TOKEN_PATH = os.path.join(PROJECT_ROOT, "token.json")
 
-SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 
 def main():
     if not os.path.exists(CREDENTIALS_PATH):

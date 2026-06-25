@@ -20,14 +20,15 @@ Two domain-specific Agent Skills (`household-planning`, `workout-planning`) are 
 
 - **Database layer** (`app/db.py`) — SQLite, six tables: tasks, habits, habit_logs, workout_logs, calendar_events, plan_exercises.
 - **Agent layer** (`app/agent.py`, `app/tools.py`) — Gemini-powered ADK agent with structured tools for every mutation (create/complete/delete, with explicit deletion confirmation), a read-only SQL query tool for advisory questions, dynamic skill loading via a `before_agent_callback`, and a `McpToolset` connection to a local Calendar MCP server for real Google Calendar access.
-- **Calendar MCP server** (`app/mcp_servers/calendar_server.py`, `app/mcp_servers/calendar_auth.py`) — a `FastMCP` server run as a separate process over stdio, exposing a `list_events` tool backed by the real Google Calendar API via OAuth2 (`scripts/authorize_calendar.py` runs the one-time consent flow). Falls back to a mocked response set when `PERSONAL_ASSISTANT_CALENDAR_MOCK=true`, used in tests.
+- **Calendar MCP server** (`app/mcp_servers/calendar_server.py`, `app/mcp_servers/calendar_auth.py`) — a `FastMCP` server run as a separate process over stdio, exposing `list_events`, `create_event`, `update_event`, and `delete_event` tools backed by the real Google Calendar API via OAuth2 with the `calendar.events` write scope (`scripts/authorize_calendar.py` runs the one-time consent flow). Falls back to a mocked response set when `PERSONAL_ASSISTANT_CALENDAR_MOCK=true`, used in tests.
 - **Web layer** (`app/main.py`, `app/templates/`) — FastAPI + Jinja2 + HTMX, five navigable tabs (Dashboard, Tasks, Habits, Workouts, Calendar) with a persistent chat sidebar, served as a single `uvicorn` process — no Node/npm toolchain.
 
 Design decisions worth calling out:
 - Deterministic logic (thresholds, date math, warm-up set calculations, recurrence advancement) lives in code, never in model reasoning — the model is only used for genuine judgment calls.
 - Recurring tasks preserve history via `parent_task_id` lineage rather than mutating a single row in place.
 - The Dashboard tab aggregates "what's due today" via plain SQL — no LLM call on every tab visit.
-- The chat assistant's calendar awareness is real (via the MCP server above), but the Dashboard and Calendar tab's visual widgets deliberately stay on a seeded mock dataset, queried directly with zero LLM involvement — keeping that deterministic aggregation path separate from the agent/MCP path is intentional, not a gap.
+- The Dashboard and Calendar tab's visual widgets call the real Google Calendar API directly (no LLM involvement — `fetch_events_for_date`/`fetch_events_for_range` in `app/mcp_servers/calendar_auth.py`, shared with the MCP server's `list_events` tool), with no caching — an earlier short-TTL cache was removed after it caused stale data to display following a chat-driven calendar edit, since the MCP server runs as a separate process with no way to invalidate it. They fall back to the seeded mock dataset only if OAuth isn't set up (`token.json` missing) or the API call fails — keeping that deterministic aggregation path independent of the agent/MCP path, with a real-data-first, mock-as-fallback design.
+- Calendar event creation/modification/deletion via chat follows the same explicit-confirmation discipline as deletion elsewhere in the app — and, unlike tasks/habits, even *creating* a calendar event requires confirmation first, since it writes to the user's real external calendar, not just local data.
 - Tests run against an isolated temporary SQLite database (`tests/conftest.py` patches `DB_PATH` per test) — never the live file, after a real incident where routine test runs silently wiped real active-exercise data. The same isolation problem applies across process boundaries for MCP subprocess tests, solved via the `PERSONAL_ASSISTANT_DB_PATH`/`PERSONAL_ASSISTANT_CALENDAR_MOCK` environment variables rather than `monkeypatch`, which doesn't cross processes.
 - The agent resolves names/descriptions to internal database IDs itself before any mutation or confirmation — it never asks the user to supply or look up a raw ID. The same explicit-confirmation pattern applies to any plan-altering tool call (e.g. `sync_active_exercises`) based on assumed defaults, not just deletions.
 
@@ -40,7 +41,7 @@ Design decisions worth calling out:
 - Per-habit completion heatmap across all four habit frequencies (daily/weekly/biweekly/monthly), each with a frequency-appropriate grid shape and time window
 - Workout history grouped into per-date session cards, rather than a flat exercise-by-exercise list
 - Recurring task support with safe undo (no duplicate/orphaned instances)
-- Real Google Calendar integration via a custom MCP server with OAuth2 authentication
+- Real Google Calendar integration via a custom MCP server with OAuth2 authentication — read, create, update, and delete events through natural-language chat, with explicit confirmation before any write
 - Explicit deletion confirmation on all destructive actions, extended to any plan-altering tool call based on assumed defaults
 - Medical disclaimers on fitness advice; all advisory answers grounded in actual logged data
 
@@ -105,6 +106,5 @@ personal-assistant/
 
 ## Known Limitations / Planned Enhancements
 
-- The chat assistant reads your real Google Calendar via an MCP server with OAuth2 — but the Dashboard and Calendar tab's visual widgets still display a seeded mock dataset rather than that same real data; extending them is a scoped next step
 - Exercise-name matching for plan/progress tracking is exact-string only (no fuzzy matching)
 - No proactive/ambient nudges — the agent is reactive to the dashboard or chat, not scheduled

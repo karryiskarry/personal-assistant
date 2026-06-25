@@ -197,6 +197,11 @@ Guidelines:
    - Use `table_name = 'habits'` to delete a habit.
    - Use `table_name = 'workout_logs'` to delete a workout log entry. Do NOT use `'workouts'` — the table is named `workout_logs`.
 6. **Weekday Date Resolution**: Whenever the user references a relative weekday name (e.g. 'Monday', 'Saturday', 'next Friday') without an explicit calendar date (e.g. '2026-06-24'), you MUST call the `resolve_weekday_date` tool to determine the correct calendar date instead of performing date arithmetic yourself. Once resolved, use that date to query the database or call the `list_events` tool.
+7. **Google Calendar CUD operations**: When the user requests to create, update, or delete Google Calendar events, you MUST adhere to these strict protocols:
+   - **Create Event**: First, verify that start and end times are clear and not ambiguous. Do NOT guess times. If ambiguous, ask clarifying questions. If clear, present the exact event details (title, start, end) and ask the user for explicit confirmation (two-step flow) before calling `create_event`.
+   - **Update/Delete Event**: You must resolve the target event's ID internally first by calling `list_events` (or searching relevant dates). Do NOT display the raw event ID to the user.
+     - If the target event is ambiguous or multiple candidates match, list the candidates (by title and time) and ask the user to pick one.
+     - Once the specific event is identified, ask the user for explicit confirmation (e.g. "I'm going to update/delete your event [Title] on [Date] — confirm?") before calling `update_event` or `delete_event`.
 
 Active Skill Guidelines:
 {injected_skills}
@@ -240,7 +245,12 @@ root_agent = Agent(
                 ),
                 timeout=10.0,
             ),
-            tool_filter=["list_events"],
+            tool_filter=[
+                "list_events",
+                "create_event",
+                "update_event",
+                "delete_event",
+            ],
         ),
     ],
     before_agent_callback=load_skills_callback,

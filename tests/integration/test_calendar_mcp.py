@@ -52,20 +52,21 @@ def _build_toolset() -> McpToolset:
             ),
             timeout=15.0,
         ),
-        tool_filter=["list_events"],
+        tool_filter=["list_events", "create_event", "update_event", "delete_event"],
     )
 
 
 @pytest.mark.asyncio
 async def test_calendar_mcp_tool_registration():
-    """list_events is discoverable in the McpToolset after subprocess spawn."""
+    """list_events, create_event, update_event, and delete_event are discoverable."""
     toolset = _build_toolset()
     try:
         tools = await toolset.get_tools()
         tool_names = [t.name for t in tools]
-        assert "list_events" in tool_names, (
-            f"Expected 'list_events' in MCP tool list, got: {tool_names}"
-        )
+        for expected in ["list_events", "create_event", "update_event", "delete_event"]:
+            assert expected in tool_names, (
+                f"Expected '{expected}' in MCP tool list, got: {tool_names}"
+            )
     finally:
         await toolset.close()
 
@@ -101,5 +102,95 @@ async def test_calendar_mcp_tool_returns_mocked_event():
         assert event["title"] == TEST_EVENT_TITLE
         assert event["start_time"] == TEST_START_TIME
         assert event["end_time"] == TEST_END_TIME
+    finally:
+        await toolset.close()
+
+
+@pytest.mark.asyncio
+async def test_calendar_mcp_create_event():
+    """Calling create_event returns success and the echoed event details with timezone offset applied."""
+    toolset = _build_toolset()
+    try:
+        result = await toolset._execute_with_session(
+            lambda session: session.call_tool(
+                "create_event",
+                arguments={
+                    "title": "Meeting with Bob",
+                    "start_time": "2099-01-15 14:00",
+                    "end_time": "2099-01-15 15:00",
+                },
+            ),
+            "Failed to call create_event via MCP session",
+        )
+
+        assert not result.isError, f"MCP tool call returned an error: {result}"
+        assert result.content, "MCP tool call returned empty content"
+
+        payload = json.loads(result.content[0].text)
+        assert payload["status"] == "success", f"Expected success status, got: {payload}"
+        
+        event = payload["event"]
+        assert event["id"] == "mock_created_event_id"
+        assert event["title"] == "Meeting with Bob"
+        # The times should be reformatted back to YYYY-MM-DD HH:MM:SS format
+        assert event["start_time"] == "2099-01-15 14:00:00"
+        assert event["end_time"] == "2099-01-15 15:00:00"
+    finally:
+        await toolset.close()
+
+
+@pytest.mark.asyncio
+async def test_calendar_mcp_update_event():
+    """Calling update_event returns success and the updated event details."""
+    toolset = _build_toolset()
+    try:
+        result = await toolset._execute_with_session(
+            lambda session: session.call_tool(
+                "update_event",
+                arguments={
+                    "event_id": "test_event_update_123",
+                    "title": "Updated Meeting with Bob",
+                    "start_time": "2099-01-15 16:30",
+                    "end_time": "2099-01-15 17:30",
+                },
+            ),
+            "Failed to call update_event via MCP session",
+        )
+
+        assert not result.isError, f"MCP tool call returned an error: {result}"
+        assert result.content, "MCP tool call returned empty content"
+
+        payload = json.loads(result.content[0].text)
+        assert payload["status"] == "success", f"Expected success status, got: {payload}"
+        
+        event = payload["event"]
+        assert event["id"] == "test_event_update_123"
+        assert event["title"] == "Updated Meeting with Bob"
+        assert event["start_time"] == "2099-01-15 16:30:00"
+        assert event["end_time"] == "2099-01-15 17:30:00"
+    finally:
+        await toolset.close()
+
+
+@pytest.mark.asyncio
+async def test_calendar_mcp_delete_event():
+    """Calling delete_event returns success."""
+    toolset = _build_toolset()
+    try:
+        result = await toolset._execute_with_session(
+            lambda session: session.call_tool(
+                "delete_event",
+                arguments={
+                    "event_id": "test_event_delete_123",
+                },
+            ),
+            "Failed to call delete_event via MCP session",
+        )
+
+        assert not result.isError, f"MCP tool call returned an error: {result}"
+        assert result.content, "MCP tool call returned empty content"
+
+        payload = json.loads(result.content[0].text)
+        assert payload["status"] == "success", f"Expected success status, got: {payload}"
     finally:
         await toolset.close()

@@ -145,41 +145,13 @@ def seed_mock_data():
     if cursor.fetchone()[0] == 0:
         today = datetime.now()
 
-        # Seed calendar events for today and next few days
+        # Seed a single, clearly-labeled example event
         events = [
             (
-                "Morning Sync Meeting",
-                today.replace(hour=9, minute=0).strftime("%Y-%m-%d %H:%M"),
-                today.replace(hour=9, minute=30).strftime("%Y-%m-%d %H:%M"),
-            ),
-            (
-                "Lunch with Team",
-                today.replace(hour=12, minute=0).strftime("%Y-%m-%d %H:%M"),
-                today.replace(hour=13, minute=0).strftime("%Y-%m-%d %H:%M"),
-            ),
-            (
-                "Focus Work Block",
-                today.replace(hour=14, minute=0).strftime("%Y-%m-%d %H:%M"),
-                today.replace(hour=16, minute=0).strftime("%Y-%m-%d %H:%M"),
-            ),
-            (
-                "Gym Session",
-                (today + timedelta(days=1))
-                .replace(hour=17, minute=30)
-                .strftime("%Y-%m-%d %H:%M"),
-                (today + timedelta(days=1))
-                .replace(hour=18, minute=30)
-                .strftime("%Y-%m-%d %H:%M"),
-            ),
-            (
-                "Dentist Appointment",
-                (today + timedelta(days=2))
-                .replace(hour=10, minute=0)
-                .strftime("%Y-%m-%d %H:%M"),
-                (today + timedelta(days=2))
-                .replace(hour=11, minute=0)
-                .strftime("%Y-%m-%d %H:%M"),
-            ),
+                "Example Event — connect Google Calendar or add your own",
+                today.replace(hour=10, minute=0).strftime("%Y-%m-%d %H:%M"),
+                today.replace(hour=11, minute=0).strftime("%Y-%m-%d %H:%M"),
+            )
         ]
         cursor.executemany(
             "INSERT INTO calendar_events (title, start_time, end_time) VALUES (?, ?, ?)",

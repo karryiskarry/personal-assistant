@@ -14,6 +14,7 @@ from .db import get_db_connection, get_readonly_db_connection
 from .tools import (
     advance_recurring_task,
     get_calendar_events,
+    get_calendar_events_range,
     get_habit_streaks,
     get_month_start_relative,
     get_period_start,
@@ -119,13 +120,16 @@ def render_calendar_events_html(events, show_date=False, empty_message="No event
             group_class = "calendar-day-group past-day" if is_past_day else "calendar-day-group"
             
             for e in group:
-                start_time = (
-                    e["start_time"].split(" ")[1] if " " in e["start_time"] else e["start_time"]
-                )
-                end_time = (
-                    e["end_time"].split(" ")[1] if " " in e["end_time"] else e["end_time"]
-                )
-                time_str = f'<span class="calendar-duration">{start_time} - {end_time}</span>'
+                if e.get("all_day"):
+                    time_str = '<span class="calendar-duration">All day</span>'
+                else:
+                    start_time = (
+                        e["start_time"].split(" ")[1] if " " in e["start_time"] else e["start_time"]
+                    )
+                    end_time = (
+                        e["end_time"].split(" ")[1] if " " in e["end_time"] else e["end_time"]
+                    )
+                    time_str = f'<span class="calendar-duration">{start_time[:5]} - {end_time[:5]}</span>'
                 
                 is_today = (date_part == today_str)
                 is_past = (e.get("end_time") and e["end_time"] < now_str)
@@ -150,14 +154,16 @@ def render_calendar_events_html(events, show_date=False, empty_message="No event
         return html
 
     for e in events:
-        start_time = (
-            e["start_time"].split(" ")[1] if " " in e["start_time"] else e["start_time"]
-        )
-        end_time = (
-            e["end_time"].split(" ")[1] if " " in e["end_time"] else e["end_time"]
-        )
-
-        time_str = f'<span class="calendar-duration">{start_time} - {end_time}</span>'
+        if e.get("all_day"):
+            time_str = '<span class="calendar-duration">All day</span>'
+        else:
+            start_time = (
+                e["start_time"].split(" ")[1] if " " in e["start_time"] else e["start_time"]
+            )
+            end_time = (
+                e["end_time"].split(" ")[1] if " " in e["end_time"] else e["end_time"]
+            )
+            time_str = f'<span class="calendar-duration">{start_time[:5]} - {end_time[:5]}</span>'
 
         html += f"""
         <div class="calendar-item">
@@ -511,13 +517,7 @@ async def get_dashboard_tasks():
 @app.get("/dashboard/habits", response_class=HTMLResponse)
 async def get_dashboard_habits():
     try:
-        today_str = datetime.date.today().strftime("%Y-%m-%d")
-        conn = get_readonly_db_connection()
-        cursor = conn.cursor()
         streaks_data = get_habit_streaks()
-        cursor.execute("SELECT habit_id FROM habit_logs WHERE date = ?", (today_str,))
-        logged_today = {row["habit_id"] for row in cursor.fetchall()}
-        conn.close()
     except Exception as e:
         return HTMLResponse(
             content=f"<div style='color: var(--accent-red)'>Error: {e}</div>"
@@ -528,10 +528,33 @@ async def get_dashboard_habits():
             content=f"<div style='color: var(--accent-red)'>Error: {streaks_data.get('message')}</div>"
         )
 
+    today = datetime.date.today()
     uncompleted_habits = []
     for name, data in streaks_data["streaks"].items():
-        habit_id = data["habit_id"]
-        if habit_id not in logged_today:
+        # Parse created_at to a date
+        created_at_str = data.get("created_at") or ""
+        if " " in created_at_str:
+            created_at_str = created_at_str.split(" ")[0]
+        try:
+            created_date = datetime.datetime.strptime(created_at_str, "%Y-%m-%d").date()
+        except Exception:
+            created_date = datetime.date.min
+
+        freq = data["frequency"].lower().strip()
+        current_period = get_period_start(today, freq, created_date)
+
+        completed = False
+        last_logged_str = data.get("last_logged")
+        if last_logged_str:
+            try:
+                last_logged_date = datetime.datetime.strptime(last_logged_str, "%Y-%m-%d").date()
+                last_logged_period = get_period_start(last_logged_date, freq, created_date)
+                if last_logged_period == current_period:
+                    completed = True
+            except Exception:
+                pass
+
+        if not completed:
             uncompleted_habits.append((name, data))
 
     if not uncompleted_habits:
@@ -786,13 +809,6 @@ async def get_habits_section(request: Request):
 async def get_habits_items():
     try:
         streaks_data = get_habit_streaks()
-
-        today_str = datetime.date.today().strftime("%Y-%m-%d")
-        conn = get_readonly_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT habit_id FROM habit_logs WHERE date = ?", (today_str,))
-        logged_today = {row["habit_id"] for row in cursor.fetchall()}
-        conn.close()
     except Exception as e:
         return HTMLResponse(
             content=f"<div style='color: var(--accent-red)'>Error: {e}</div>"
@@ -810,14 +826,6 @@ async def get_habits_items():
 
     for name, data in streaks_data["streaks"].items():
         habit_id = data["habit_id"]
-        completed = habit_id in logged_today
-
-        btn_attr = (
-            'class="btn-log-habit completed" disabled'
-            if completed
-            else f'class="btn-log-habit" hx-post="/habits/{habit_id}/log" hx-swap="none"'
-        )
-        btn_text = "Completed" if completed else "Log Today"
 
         # Parse habit created_at date
         created_at_str = data.get("created_at") or ""
@@ -827,6 +835,27 @@ async def get_habits_items():
             created_date = datetime.datetime.strptime(created_at_str, "%Y-%m-%d").date()
         except Exception:
             created_date = datetime.date.min
+
+        freq = data["frequency"].lower().strip()
+        current_period = get_period_start(today, freq, created_date)
+
+        completed = False
+        last_logged_str = data.get("last_logged")
+        if last_logged_str:
+            try:
+                last_logged_date = datetime.datetime.strptime(last_logged_str, "%Y-%m-%d").date()
+                last_logged_period = get_period_start(last_logged_date, freq, created_date)
+                if last_logged_period == current_period:
+                    completed = True
+            except Exception:
+                pass
+
+        btn_attr = (
+            'class="btn-log-habit completed" disabled'
+            if completed
+            else f'class="btn-log-habit" hx-post="/habits/{habit_id}/log" hx-swap="none"'
+        )
+        btn_text = "Completed" if completed else "Log Today"
 
         # Generate heatmap HTML
         freq = data["frequency"].lower().strip()
@@ -994,13 +1023,14 @@ async def calendar_section(request: Request):
 @app.get("/calendar/items", response_class=HTMLResponse)
 async def get_calendar_items():
     try:
-        conn = get_readonly_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, title, start_time, end_time FROM calendar_events ORDER BY start_time ASC"
-        )
-        events = [dict(row) for row in cursor.fetchall()]
-        conn.close()
+        today = datetime.date.today()
+        start_date = (today - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+        end_date = (today + datetime.timedelta(days=56)).strftime("%Y-%m-%d")
+        
+        cal_data = get_calendar_events_range(start_date, end_date)
+        if cal_data.get("status") == "error":
+            raise Exception(cal_data.get("message", "Unknown error fetching calendar events"))
+        events = cal_data.get("events", [])
     except Exception as e:
         return HTMLResponse(
             content=f"<div style='color: var(--accent-red)'>Error: {e}</div>"
@@ -1013,6 +1043,8 @@ async def get_calendar_today():
     try:
         today_str = datetime.date.today().strftime("%Y-%m-%d")
         cal_data = get_calendar_events(today_str)
+        if cal_data.get("status") == "error":
+            raise Exception(cal_data.get("message", "Unknown error fetching calendar events"))
         events = cal_data.get("events", [])
         
         now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")

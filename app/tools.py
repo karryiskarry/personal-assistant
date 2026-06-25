@@ -1,9 +1,12 @@
 import calendar
 import datetime
 import json
+import os
 import re
+import time
 
 from .db import get_db_connection, get_readonly_db_connection
+from app.mcp_servers.calendar_auth import fetch_events_for_date, fetch_events_for_range
 
 
 def get_current_date() -> dict:
@@ -448,16 +451,53 @@ def get_calendar_events(date: str) -> dict:
         date: The date in YYYY-MM-DD format.
     """
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, title, start_time, end_time FROM calendar_events WHERE start_time LIKE ? ORDER BY start_time ASC",
-            (f"{date}%",),
-        )
-        rows = cursor.fetchall()
-        conn.close()
-        return {"status": "success", "events": [dict(row) for row in rows]}
+        events = fetch_events_for_date(date)
+        return {"status": "success", "events": events}
+    except FileNotFoundError:
+        # Fall back to SQLite mock data if Google Calendar OAuth is not configured
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, title, start_time, end_time FROM calendar_events WHERE start_time LIKE ? ORDER BY start_time ASC",
+                (f"{date}%",),
+            )
+            rows = cursor.fetchall()
+            conn.close()
+            return {"status": "success", "events": [dict(row) for row in rows]}
+        except Exception as sqlite_err:
+            return {"status": "error", "message": str(sqlite_err)}
     except Exception as e:
+        # Return error directly for other failure modes
+        return {"status": "error", "message": str(e)}
+
+
+def get_calendar_events_range(start_date: str, end_date: str) -> dict:
+    """Gets calendar events for a date range (start_date to end_date).
+
+    Args:
+        start_date: The start date in YYYY-MM-DD format.
+        end_date: The end date in YYYY-MM-DD format.
+    """
+    try:
+        events = fetch_events_for_range(start_date, end_date)
+        return {"status": "success", "events": events}
+    except FileNotFoundError:
+        # Fall back to SQLite mock data if Google Calendar OAuth is not configured
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, title, start_time, end_time FROM calendar_events ORDER BY start_time ASC"
+            )
+            rows = cursor.fetchall()
+            conn.close()
+            events = [dict(row) for row in rows]
+            return {"status": "success", "events": events}
+        except Exception as sqlite_err:
+            return {"status": "error", "message": str(sqlite_err)}
+    except Exception as e:
+        # Return error directly for other failure modes
         return {"status": "error", "message": str(e)}
 
 
