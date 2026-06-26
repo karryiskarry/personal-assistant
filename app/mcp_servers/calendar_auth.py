@@ -163,8 +163,13 @@ class MockEventsResource:
             )
 
         demo_events = [
-            ("Client Call: Q2 Review", at(-1, 11, 0), at(-1, 11, 30)),
+            ("Q1 Planning Session", at(-6, 10, 0), at(-6, 11, 0)),
+            ("Onboarding Sync", at(-5, 14, 0), at(-5, 14, 30)),
+            ("Design Review", at(-4, 11, 0), at(-4, 12, 0)),
+            ("1:1 with Manager", at(-3, 9, 30), at(-3, 10, 0)),
+            ("Client Call: Q2 Review", at(-2, 11, 0), at(-2, 11, 30)),
             ("Code Review Session", at(-1, 15, 0), at(-1, 16, 0)),
+            ("Lunch with Team", at(-1, 12, 0), at(-1, 13, 0)),
             ("Morning Standup", at(0, 9, 0), at(0, 9, 15)),
             ("Deep Work: Capstone Demo Prep", at(0, 13, 0), at(0, 15, 0)),
             ("Gym Session", at(0, 17, 30), at(0, 18, 30)),
