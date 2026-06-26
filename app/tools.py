@@ -10,8 +10,15 @@ from app.mcp_servers.calendar_auth import fetch_events_for_date, fetch_events_fo
 
 
 def get_current_date() -> dict:
-    """Gets the current local date in YYYY-MM-DD format."""
-    return {"date": datetime.date.today().strftime("%Y-%m-%d")}
+    """Gets the current local date and time.
+
+    Returns:
+        A dict with 'date' (YYYY-MM-DD) and 'time' (HH:MM, 24-hour, local
+        system time) — call this before reasoning about whether a requested
+        time has already passed, rather than guessing the current time.
+    """
+    now = datetime.datetime.now()
+    return {"date": now.strftime("%Y-%m-%d"), "time": now.strftime("%H:%M")}
 
 
 def create_task(
