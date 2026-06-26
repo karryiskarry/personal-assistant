@@ -205,6 +205,14 @@ class MockEventsResource:
             if window_start and window_end and not (window_start <= event_start <= window_end):
                 continue
             items.append(event)
+
+        # The real Calendar API guarantees orderBy="startTime" — callers like
+        # render_calendar_events_html() group consecutive same-day events via
+        # itertools.groupby, which only merges adjacent items. Appending
+        # persisted events after the demo events without sorting put a
+        # same-day event in its own separate trailing group instead of
+        # merging into its rightful day.
+        items.sort(key=lambda e: e["start"]["dateTime"])
         return items
 
 class MockGoogleCalendarClient:
