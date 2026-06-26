@@ -243,6 +243,16 @@ root_agent = Agent(
                         "app.mcp_servers.calendar_server",
                     ],
                     cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    # Without an explicit env, the MCP SDK only forwards a fixed
+                    # safe list (HOME, PATH, etc.) to the subprocess — NOT this
+                    # process's PERSONAL_ASSISTANT_CALENDAR_MOCK. Without this,
+                    # the subprocess silently falls back to the real Google
+                    # Calendar API even when the parent process has mock mode on.
+                    env={
+                        "PERSONAL_ASSISTANT_CALENDAR_MOCK": os.environ.get(
+                            "PERSONAL_ASSISTANT_CALENDAR_MOCK", ""
+                        )
+                    },
                 ),
                 timeout=10.0,
             ),
