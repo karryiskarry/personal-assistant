@@ -175,7 +175,10 @@ class MockEventsResource:
             ("Gym Session", at(0, 17, 30), at(0, 18, 30)),
             ("Dentist Appointment", at(1, 10, 0), at(1, 11, 0)),
             ("Team Retro", at(2, 14, 0), at(2, 14, 30)),
+            ("Product Demo Walkthrough", at(3, 10, 30), at(3, 11, 30)),
             ("Birthday Dinner", at(4, 19, 0), at(4, 21, 0)),
+            ("Quarterly Planning", at(5, 9, 0), at(5, 10, 30)),
+            ("Weekend Hike", at(6, 8, 0), at(6, 11, 0)),
         ]
 
         items = []
