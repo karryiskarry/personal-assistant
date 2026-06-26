@@ -551,7 +551,7 @@ async def get_dashboard_habits():
             <div class="habit-info">
                 <div class="habit-name">{name}</div>
                 <div class="habit-desc">{data["frequency"]}</div>
-                <div class="habit-streak"><span class="icon-text-pair"><span class="emoji-icon">🔥</span><span>{data["current_streak"]} {streak_unit} streak</span></span></div>
+                <div class="habit-streak">{f'<span class="icon-text-pair"><span class="emoji-icon">🔥</span><span>{data["current_streak"]} {streak_unit} streak</span></span>' if data["current_streak"] > 0 else '<span>No streak yet</span>'}</div>
             </div>
             <button {btn_attr}>Log Today</button>
         </div>
@@ -952,7 +952,7 @@ async def get_habits_items():
             <div class="habit-info">
                 <div class="habit-name">{name}</div>
                 <div class="habit-desc">{data["frequency"]}</div>
-                <div class="habit-streak"><span class="icon-text-pair"><span class="emoji-icon">🔥</span><span>{data["current_streak"]} {streak_unit} streak</span></span></div>
+                <div class="habit-streak">{f'<span class="icon-text-pair"><span class="emoji-icon">🔥</span><span>{data["current_streak"]} {streak_unit} streak</span></span>' if data["current_streak"] > 0 else '<span>No streak yet</span>'}</div>
                 {heatmap_html}
             </div>
             <button {btn_attr}>{btn_text}</button>
