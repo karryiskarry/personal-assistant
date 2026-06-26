@@ -528,34 +528,11 @@ async def get_dashboard_habits():
             content=f"<div style='color: var(--accent-red)'>Error: {streaks_data.get('message')}</div>"
         )
 
-    today = datetime.date.today()
-    uncompleted_habits = []
-    for name, data in streaks_data["streaks"].items():
-        # Parse created_at to a date
-        created_at_str = data.get("created_at") or ""
-        if " " in created_at_str:
-            created_at_str = created_at_str.split(" ")[0]
-        try:
-            created_date = datetime.datetime.strptime(created_at_str, "%Y-%m-%d").date()
-        except Exception:
-            created_date = datetime.date.min
-
-        freq = data["frequency"].lower().strip()
-        current_period = get_period_start(today, freq, created_date)
-
-        completed = False
-        last_logged_str = data.get("last_logged")
-        if last_logged_str:
-            try:
-                last_logged_date = datetime.datetime.strptime(last_logged_str, "%Y-%m-%d").date()
-                last_logged_period = get_period_start(last_logged_date, freq, created_date)
-                if last_logged_period == current_period:
-                    completed = True
-            except Exception:
-                pass
-
-        if not completed:
-            uncompleted_habits.append((name, data))
+    uncompleted_habits = [
+        (name, data)
+        for name, data in streaks_data["streaks"].items()
+        if not data.get("completed_current_period")
+    ]
 
     if not uncompleted_habits:
         return HTMLResponse(
@@ -836,19 +813,7 @@ async def get_habits_items():
         except Exception:
             created_date = datetime.date.min
 
-        freq = data["frequency"].lower().strip()
-        current_period = get_period_start(today, freq, created_date)
-
-        completed = False
-        last_logged_str = data.get("last_logged")
-        if last_logged_str:
-            try:
-                last_logged_date = datetime.datetime.strptime(last_logged_str, "%Y-%m-%d").date()
-                last_logged_period = get_period_start(last_logged_date, freq, created_date)
-                if last_logged_period == current_period:
-                    completed = True
-            except Exception:
-                pass
+        completed = data.get("completed_current_period", False)
 
         btn_attr = (
             'class="btn-log-habit completed" disabled'

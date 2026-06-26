@@ -579,12 +579,20 @@ def get_habit_streaks() -> dict:
                 "monthly": "month",
             }
 
+            # "Completed" means logged within the habit's current period, not
+            # logged on today's exact date — a weekly/biweekly/monthly habit
+            # logged earlier in its period is still done, even if that date
+            # isn't today.
+            current_period = get_period_start(today, freq, created_date)
+            completed_current_period = bool(logs) and get_period_start(logs[0], freq, created_date) == current_period
+
             streaks[name] = {
                 "habit_id": habit_id,
                 "frequency": h["frequency"],
                 "current_streak": streak,
                 "streak_unit": streak_units.get(freq, "day"),
                 "last_logged": logs[0].strftime("%Y-%m-%d") if logs else None,
+                "completed_current_period": completed_current_period,
                 "created_at": h["created_at"],
                 "completed_dates": recent_logs,
             }
