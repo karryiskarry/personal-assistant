@@ -12,6 +12,7 @@ deterministic and safe to run in a CI environment.
 
 import json
 import os
+import tempfile
 import pytest
 from mcp import StdioServerParameters
 
@@ -45,9 +46,12 @@ def _build_toolset() -> McpToolset:
                     "app.mcp_servers.calendar_server",
                 ],
                 cwd=_PROJECT_ROOT,
-                # Pass the mock calendar flag to the subprocess via env var.
+                # Pass the mock calendar flag to the subprocess via env var, and
+                # point its mock-event persistence at a throwaway file so tests
+                # never read or write the real demo-recording state file.
                 env={
-                    "PERSONAL_ASSISTANT_CALENDAR_MOCK": "true"
+                    "PERSONAL_ASSISTANT_CALENDAR_MOCK": "true",
+                    "PERSONAL_ASSISTANT_MOCK_CALENDAR_STATE_PATH": tempfile.mktemp(suffix=".json"),
                 },
             ),
             timeout=15.0,
@@ -130,7 +134,10 @@ async def test_calendar_mcp_create_event():
         assert payload["status"] == "success", f"Expected success status, got: {payload}"
         
         event = payload["event"]
-        assert event["id"] == "mock_created_event_id"
+        # Each created event now gets a unique generated ID, since created
+        # events are actually persisted (so they show up in later list()
+        # calls too) rather than just echoed back statelessly.
+        assert event["id"].startswith("mock_created_")
         assert event["title"] == "Meeting with Bob"
         # The times should be reformatted back to YYYY-MM-DD HH:MM:SS format
         assert event["start_time"] == "2099-01-15 14:00:00"

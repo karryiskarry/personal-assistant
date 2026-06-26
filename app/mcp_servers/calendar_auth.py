@@ -1,12 +1,44 @@
 import datetime
+import json
 import os
 import sys
+import uuid
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TOKEN_PATH = os.path.join(PROJECT_ROOT, "token.json")
+
+# Persists mock-mode create/update/delete calls to disk so they're visible to
+# later list() calls — including across the process boundary between the MCP
+# server subprocess (chat) and the main FastAPI process (Dashboard/Calendar
+# tab), which don't share memory. Delete this file to reset mock state
+# between demo recording takes.
+MOCK_STATE_PATH = os.environ.get(
+    "PERSONAL_ASSISTANT_MOCK_CALENDAR_STATE_PATH",
+    os.path.join(PROJECT_ROOT, "mock_calendar_state.json"),
+)
+
+
+def _load_mock_events() -> list[dict]:
+    if not os.path.exists(MOCK_STATE_PATH):
+        return []
+    try:
+        with open(MOCK_STATE_PATH, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _save_mock_events(events: list[dict]) -> None:
+    with open(MOCK_STATE_PATH, "w") as f:
+        json.dump(events, f)
+
+
+_DEFAULT_MOCK_START = {"dateTime": "2099-01-15T10:00:00Z"}
+_DEFAULT_MOCK_END = {"dateTime": "2099-01-15T11:00:00Z"}
+
 
 class MockEventsResource:
     def list(self, **kwargs):
@@ -38,16 +70,58 @@ class MockEventsResource:
         op = getattr(self, "_operation", "list")
         if op == "list":
             return {"items": self._list_items(self._kwargs.get("timeMin"), self._kwargs.get("timeMax"))}
-        elif op in ("insert", "patch"):
-            body = self._kwargs.get("body", {})
-            return {
-                "id": self._kwargs.get("eventId", "mock_created_event_id"),
-                "summary": body.get("summary", "Mock Event"),
-                "start": body.get("start", {"dateTime": "2099-01-15T10:00:00Z"}),
-                "end": body.get("end", {"dateTime": "2099-01-15T11:00:00Z"}),
-            }
+        elif op == "insert":
+            return self._insert_event(self._kwargs.get("body", {}))
+        elif op == "patch":
+            return self._patch_event(self._kwargs.get("eventId"), self._kwargs.get("body", {}))
         elif op == "delete":
-            return {}
+            return self._delete_event(self._kwargs.get("eventId"))
+        return {}
+
+    @staticmethod
+    def _insert_event(body: dict) -> dict:
+        events = _load_mock_events()
+        new_event = {
+            "id": f"mock_created_{uuid.uuid4().hex[:8]}",
+            "summary": body.get("summary", "Mock Event"),
+            "start": body.get("start", _DEFAULT_MOCK_START),
+            "end": body.get("end", _DEFAULT_MOCK_END),
+        }
+        events.append(new_event)
+        _save_mock_events(events)
+        return new_event
+
+    @staticmethod
+    def _patch_event(event_id: str, body: dict) -> dict:
+        events = _load_mock_events()
+        for event in events:
+            if event["id"] == event_id:
+                if "summary" in body:
+                    event["summary"] = body["summary"]
+                if "start" in body:
+                    event["start"] = body["start"]
+                if "end" in body:
+                    event["end"] = body["end"]
+                _save_mock_events(events)
+                return event
+
+        # Unknown ID — e.g. one of the synthetic demo events from
+        # _list_items, or a made-up ID in a test — echo back the patch
+        # without persisting, so updating an event that was never actually
+        # created via insert() still succeeds rather than failing.
+        return {
+            "id": event_id or "mock_created_event_id",
+            "summary": body.get("summary", "Mock Event"),
+            "start": body.get("start", _DEFAULT_MOCK_START),
+            "end": body.get("end", _DEFAULT_MOCK_END),
+        }
+
+    @staticmethod
+    def _delete_event(event_id: str) -> dict:
+        events = _load_mock_events()
+        remaining = [e for e in events if e["id"] != event_id]
+        if len(remaining) != len(events):
+            _save_mock_events(remaining)
         return {}
 
     @staticmethod
@@ -71,8 +145,8 @@ class MockEventsResource:
                 {
                     "id": "mock_event_1",
                     "summary": "MCP Integration Test Event",
-                    "start": {"dateTime": "2099-01-15T10:00:00Z"},
-                    "end": {"dateTime": "2099-01-15T11:00:00Z"},
+                    "start": _DEFAULT_MOCK_START,
+                    "end": _DEFAULT_MOCK_END,
                 }
             ]
 
@@ -111,6 +185,18 @@ class MockEventsResource:
                     "end": {"dateTime": end.isoformat()},
                 }
             )
+
+        # Merge in any events actually created/updated via insert()/patch()
+        # in this or an earlier session, so they show up here too — not just
+        # in the chat reply that confirmed creating them.
+        for event in _load_mock_events():
+            try:
+                event_start = datetime.datetime.fromisoformat(event["start"]["dateTime"])
+            except (KeyError, ValueError):
+                continue
+            if window_start and window_end and not (window_start <= event_start <= window_end):
+                continue
+            items.append(event)
         return items
 
 class MockGoogleCalendarClient:

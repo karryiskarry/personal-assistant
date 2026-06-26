@@ -211,3 +211,6 @@ tools/a2a-inspector/
 credentials.json
 token.json
 *.token.json
+
+# Mock-mode calendar CRUD state (PERSONAL_ASSISTANT_CALENDAR_MOCK=true) — runtime data, not source
+mock_calendar_state.json
