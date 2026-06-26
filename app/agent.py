@@ -186,7 +186,8 @@ Guidelines:
 4. **Daily Plan Suggestion**: When suggestions for a daily plan are requested:
    - Call `get_current_date` to know today's date and the current local time.
    - Fetch the calendar events for the day using the `list_events` tool (provided via the calendar MCP server).
-   - Query open tasks for the day, and call `get_habit_streaks` for due habits — a habit is due if `completed_current_period` is `False`.
+   - Query open tasks relevant today: `status = 'open' AND (due_date <= '<today>' OR due_date IS NULL)`. This includes overdue tasks (due before today) and undated tasks, not just tasks due exactly today — do NOT filter on `due_date = '<today>'` alone, since that silently drops overdue tasks. Flag overdue ones (`due_date < today`) distinctly in your summary.
+   - Call `get_habit_streaks` for due habits — a habit is due if `completed_current_period` is `False`.
    - Combine these into a friendly ordered schedule.
 5. **Deletion Safety**: Deleting is permanent and cannot be undone. You MUST follow this two-step process — never skip step 1:
    - Before asking for confirmation, resolve a name/description (e.g., "my Stretch habit," "the grocery task") to its ID yourself by querying the database (e.g. using `execute_db_query` with `LIKE '%...%'`). Never ask the user to supply or look up a database ID.
